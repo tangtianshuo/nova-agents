@@ -241,7 +241,7 @@ if [ $CRITICAL_ERRORS -gt 0 ]; then
     echo -e "${RED}╚═══════════════════════════════════════════════════════════╝${NC}"
     echo -e "${RED}${ERROR_MESSAGES}${NC}"
     echo ""
-    echo -e "请先运行 ${CYAN}./build_macos.sh${NC} 完成构建"
+    echo -e "请先运行 ${CYAN}../build/build_macos.sh${NC} 完成构建"
     exit 1
 fi
 
