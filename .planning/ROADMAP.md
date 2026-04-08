@@ -6,7 +6,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Foundation** - Auth transport layer + token storage
+- [x] **Phase 1: Foundation** - Auth transport layer + token storage (completed 2026-04-08)
 - [ ] **Phase 2: Core Flow** - Auth UI + global state management
 
 ---
@@ -28,7 +28,7 @@
 4. Token persists to `~/.nova-agents/config.json` after successful auth
 5. Auth API baseURL is configurable per environment
 
-**Plans:** TBD
+**Plans:** 1/1 plans complete
 
 ---
 
@@ -57,7 +57,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/1 | Not started | - |
+| 1. Foundation | 1/1 | Complete   | 2026-04-08 |
 | 2. Core Flow | 0/1 | Not started | - |
 
 ---
