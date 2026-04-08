@@ -10,18 +10,18 @@
 - [x] **AUTH-01**: 用户可使用手机号 + 短信验证码注册新账号（输入手机号→发送验证码→输入验证码→输入用户名→注册成功）
 - [x] **AUTH-02**: 用户可使用手机号 + 短信验证码登录已有账号（输入手机号→发送验证码→输入验证码→登录成功）
 - [x] **AUTH-03**: 登录态持久化 — 重启应用后保持登录状态（Token 存入磁盘）
-- [ ] **AUTH-04**: 用户可登出账号（清除 Token，所有 Tab 同步更新）
+- [x] **AUTH-04**: 用户可登出账号（清除 Token，所有 Tab 同步更新）
 - [ ] **AUTH-05**: 短信发送频率限制 — 60s 倒计时防刷，显示剩余时间
 - [x] **AUTH-06**: SDK HTTP 通过 Rust 代理层 — TauriAuthClient 封装，路由经 `invoke('proxy_http_request')`
 - [x] **AUTH-07**: 自定义 DiskTokenStorage — 实现 SDK TokenStorage 接口，backend 为 `~/.nova-agents/config.json`，与现有 disk-first 模式一致
-- [ ] **AUTH-08**: AuthContext 全局态 — 置于 App.tsx 根层级，位于 TabProvider 之上，所有 Tab 共享
+- [x] **AUTH-08**: AuthContext 全局态 — 置于 App.tsx 根层级，位于 TabProvider 之上，所有 Tab 共享
 - [x] **AUTH-09**: Auth API baseURL 可配置 — 支持开发/生产环境不同地址
 - [ ] **AUTH-10**: 错误处理完善 — 验证码错误/过期/频率限制/网络错误 有明确提示
 
 ### User Experience
 
-- [ ] **UX-01**: 验证码输入支持粘贴
-- [ ] **UX-02**: 加载状态 — 发送验证码/登录/注册 过程中有 loading 状态
+- [x] **UX-01**: 验证码输入支持粘贴
+- [x] **UX-02**: 加载状态 — 发送验证码/登录/注册 过程中有 loading 状态
 - [ ] **UX-03**: 登录注册页面 — 独立路由，与现有 Chat/Settings/Launcher 并列
 
 ## v2 Requirements
@@ -56,15 +56,15 @@
 | AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Complete |
 | AUTH-03 | Phase 1 | Complete |
-| AUTH-04 | Phase 2 | Pending |
+| AUTH-04 | Phase 2 | Complete |
 | AUTH-05 | Phase 2 | Pending |
 | AUTH-06 | Phase 1 | Complete |
 | AUTH-07 | Phase 1 | Complete |
-| AUTH-08 | Phase 2 | Pending |
+| AUTH-08 | Phase 2 | Complete |
 | AUTH-09 | Phase 1 | Complete |
 | AUTH-10 | Phase 2 | Pending |
-| UX-01 | Phase 2 | Pending |
-| UX-02 | Phase 2 | Pending |
+| UX-01 | Phase 2 | Complete |
+| UX-02 | Phase 2 | Complete |
 | UX-03 | Phase 2 | Pending |
 
 **Coverage:**

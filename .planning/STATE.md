@@ -4,12 +4,12 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 2
 status: unknown
-last_updated: "2026-04-08T09:50:32.477Z"
+last_updated: "2026-04-08T13:26:34.599Z"
 progress:
   total_phases: 2
   completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  total_plans: 3
+  completed_plans: 2
 ---
 
 # STATE: nova-agents SMS Auth
@@ -53,6 +53,7 @@ Plan: Not started
 | Mapped Requirements | 13 |
 
 ---
+| Phase 02-core-flow P01 | 120 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,10 @@ Plan: Not started
 - AuthContext placed at App level, above TabProvider
 - [Phase 01]: SDK HTTP via Rust proxy: TauriAuthClient uses invoke('proxy_http_request')
 - [Phase 01]: Token storage keys: nova_access_token and nova_refresh_token match SDK TokenManager constants
+- [Phase 02-core-flow]: Auth state initialization: validate token on mount
+- [Phase 02-core-flow]: Multi-tab logout sync: window.dispatchEvent + event listeners
+- [Phase 02-core-flow]: OtpInput paste handler: extract first 6 digits, fill all inputs
+- [Phase 02-core-flow]: AuthProvider placement: wrap main app container, not entire document
 
 ### Open Questions
 
