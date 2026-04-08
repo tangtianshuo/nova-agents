@@ -56,7 +56,7 @@
 | AUTH-01 | Phase 1 | Pending |
 | AUTH-02 | Phase 1 | Pending |
 | AUTH-03 | Phase 1 | Pending |
-| AUTH-04 | Phase 1 | Pending |
+| AUTH-04 | Phase 2 | Pending |
 | AUTH-05 | Phase 2 | Pending |
 | AUTH-06 | Phase 1 | Pending |
 | AUTH-07 | Phase 1 | Pending |
@@ -70,8 +70,8 @@
 **Coverage:**
 - v1 requirements: 13 total
 - Mapped to phases: 13
-- Unmapped: 0 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-08*
-*Last updated: 2026-04-08 after research synthesis*
+*Last updated: 2026-04-08 after roadmap creation*

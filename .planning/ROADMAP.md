@@ -1,0 +1,83 @@
+# ROADMAP: nova-agents SMS Authentication
+
+**Milestone:** v1.0 SMS Auth
+**Granularity:** Coarse (2 phases)
+**Created:** 2026-04-08
+
+## Phases
+
+- [ ] **Phase 1: Foundation** - Auth transport layer + token storage
+- [ ] **Phase 2: Core Flow** - Auth UI + global state management
+
+---
+
+## Phase Details
+
+### Phase 1: Foundation
+
+**Goal:** Auth HTTP transport and token storage work end-to-end
+
+**Depends on:** Nothing (first phase)
+
+**Requirements:** AUTH-01, AUTH-02, AUTH-03, AUTH-06, AUTH-07, AUTH-09
+
+**Success Criteria** (what must be TRUE):
+1. User can send SMS code via `TauriAuthClient` wrapper (SDK fetch bypasses proxy)
+2. User can register account with phone + SMS code + username
+3. User can login with phone + SMS code
+4. Token persists to `~/.nova-agents/config.json` after successful auth
+5. Auth API baseURL is configurable per environment
+
+**Plans:** TBD
+
+---
+
+### Phase 2: Core Flow
+
+**Goal:** Complete auth UX with global state and all interactive flows
+
+**Depends on:** Phase 1
+
+**Requirements:** AUTH-04, AUTH-05, AUTH-08, AUTH-10, UX-01, UX-02, UX-03
+
+**Success Criteria** (what must be TRUE):
+1. User can logout and token is cleared from disk
+2. After logout, all open tabs reflect logged-out state immediately
+3. 60-second countdown displays after sending SMS code, preventing rapid re-send
+4. Login and register pages render as independent routes (separate from Chat/Settings)
+5. OTP input accepts pasted 6-digit codes
+6. All auth operations show loading states during network requests
+7. Errors display clear messages (invalid code, expired code, rate limited, network error)
+
+**Plans:** TBD
+
+---
+
+## Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 1. Foundation | 0/1 | Not started | - |
+| 2. Core Flow | 0/1 | Not started | - |
+
+---
+
+## Coverage
+
+**Requirements:** 13/13 v1 requirements mapped
+
+| Requirement | Phase |
+|-------------|-------|
+| AUTH-01 | Phase 1 |
+| AUTH-02 | Phase 1 |
+| AUTH-03 | Phase 1 |
+| AUTH-04 | Phase 2 |
+| AUTH-05 | Phase 2 |
+| AUTH-06 | Phase 1 |
+| AUTH-07 | Phase 1 |
+| AUTH-08 | Phase 2 |
+| AUTH-09 | Phase 1 |
+| AUTH-10 | Phase 2 |
+| UX-01 | Phase 2 |
+| UX-02 | Phase 2 |
+| UX-03 | Phase 2 |
