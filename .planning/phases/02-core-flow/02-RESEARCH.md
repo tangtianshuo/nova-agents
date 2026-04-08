@@ -14,7 +14,9 @@ Phase 2 delivers the complete auth UX: global `AuthContext` at App level, login/
 
 ## User Constraints (from CONTEXT.md)
 
-### Locked Decisions
+> No CONTEXT.md exists for Phase 2. All constraints derived from Phase 1 decisions and project architecture.
+
+### Locked Decisions (from Phase 1 STATE.md)
 
 - **D-01:** Auth API baseURL stored in `AppConfig.authServerUrl`. Default to `http://localhost:3000` for dev. Setting persists to disk via `atomicModifyConfig`.
 - **D-02:** `AppConfig.auth` field stores `{ accessToken, refreshToken, user?: { userId, username }, expiresAt? }`. Tokens stored as plain strings.
@@ -25,16 +27,15 @@ Phase 2 delivers the complete auth UX: global `AuthContext` at App level, login/
 - **D-07:** Rust side: add route registration for `/auth-proxy/*` path prefix (extends existing `proxy_http_request`).
 - **D-08:** On app load, `AuthContext` reads tokens from `AppConfig.auth`. If valid `accessToken` exists, validate with backend via `validateToken()`. If refresh needed, use `refreshToken()`. Fallback to logged-out state if both fail.
 
-### Claude's Discretion
+### Project Constraints (from CLAUDE.md)
 
-- Multi-tab sync approach (SSE broadcast vs storage events) — implementation decision
-- Logout UX (confirm dialog vs instant logout)
-- Redirect destination after login (Launcher vs Chat vs Settings)
-- Specific error handling messages for each auth API error code
-
-### Deferred Ideas (OUT OF SCOPE)
-
-None — Phase 1 stayed within scope.
+- **Architecture Compliance:** HTTP traffic MUST go through Rust proxy layer — TauriAuthClient already implements this
+- **No Backend Self-Build:** auth-server is external service, only frontend integration
+- **Desktop UX Adaptation:** SMS verification needs desktop-friendly UX (input + countdown + error hints)
+- **Tab-Scoped Isolation:** Each Chat Tab has independent Sidecar, but AuthContext must be global (above TabProvider)
+- **Disk-First Config:** All auth state writes MUST use `atomicModifyConfig`, never direct React state writes
+- **Design System Compliance:** MUST use CSS variables from `design_guide.md` (colors, typography, spacing, buttons)
+- **UI/UX Pro Max Skills:** Follow accessibility and interaction best practices (4.5:1 contrast, 44px touch targets, clear focus states)
 
 ---
 
@@ -61,7 +62,7 @@ None — Phase 1 stayed within scope.
 | React Context API | 19 (React 19.2.0) | Global auth state | Built-in, no dependencies |
 | `@tauri-apps/api/core` | Tauri v2.9.6 | `invoke<T>()` for Rust IPC | Tauri native |
 | `@nova-intelligent/auth-sdk` | bundled | TauriAuthClient, AuthError, SMS types | Already in codebase (Phase 1) |
-| `lucide-react` | 0.554.0 | Icons (Loader2, CheckCircle, AlertCircle) | Already used in app |
+| `lucide-react` | 0.554.0 | Icons (Loader2, CheckCircle, AlertCircle, User, LogOut) | Already used in app |
 
 ### Supporting
 
@@ -70,7 +71,8 @@ None — Phase 1 stayed within scope.
 | `src/renderer/config/services/appConfigService.ts` | - | `atomicModifyConfig` for token persistence | Logout clears `AppConfig.auth` |
 | `src/SDK/nova-auth-sdk/src/tauri-client.ts` | - | TauriAuthClient with DiskTokenStorage | AuthContext instantiates this |
 | `src/renderer/components/Toast.tsx` | - | `useToast()` hook for error messages | Show errors on auth failures |
-| `src/renderer/context/TabContext.tsx` | - | TabProvider pattern reference | Follow same structure for AuthProvider |
+| `src/renderer/context/TabProvider.tsx` | - | TabProvider pattern reference | Follow same structure for AuthProvider |
+| `src/renderer/context/TabContext.tsx` | - | TabContext pattern for tab-based views | Reference for tab.view extension |
 
 ### Alternatives Considered
 
@@ -78,6 +80,7 @@ None — Phase 1 stayed within scope.
 |------------|-----------|----------|
 | React Context | Redux/Zustand | Over-engineering for simple auth state — Context is sufficient |
 | SSE broadcast for logout | Custom event | SSE is existing infrastructure, but custom event (`window.dispatchEvent`) is simpler for logout sync |
+| 6 separate inputs for OTP | Single input | 6 inputs provide better UX (auto-focus, paste support, visual feedback) |
 
 ---
 
@@ -89,7 +92,7 @@ None — Phase 1 stayed within scope.
 src/renderer/
 ├── context/
 │   ├── AuthContext.tsx       # NEW: AuthProvider + useAuth hook
-│   └── TabContext.tsx         # EXISTING: reference for pattern
+│   └── TabProvider.tsx       # EXISTING: reference for pattern
 ├── pages/
 │   ├── Login.tsx             # NEW: Login page (phone + SMS code)
 │   ├── Register.tsx          # NEW: Register page (phone + SMS code + username)
@@ -118,6 +121,7 @@ import { DiskTokenStorage } from '../auth/diskTokenStorage'; // from Phase 1
 import type { AuthData } from '../config/types';
 import { loadAppConfig } from '../config/services/appConfigService';
 import { useToast } from '../components/Toast';
+import { atomicModifyConfig } from '../config/services/configStore';
 
 interface User {
   userId: string;
@@ -211,11 +215,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
       await authClient.logout();
+      // Clear tokens from disk
+      await atomicModifyConfig(async (config) => {
+        config.auth = undefined;
+        return config;
+      });
       setState({
         user: null,
         isLoading: false,
         isAuthenticated: false,
       });
+      // Broadcast logout to all tabs
+      window.dispatchEvent(new CustomEvent('auth:logout'));
     } catch (error) {
       console.error('[AuthContext] Logout failed:', error);
       // Clear local state even if server logout fails
@@ -283,7 +294,7 @@ const handleSendSms = async () => {
     await sendSmsCode(phone, type);
     setCountdown(60); // Start 60-second countdown
   } catch (error) {
-    // Error handling
+    // Error handling via toast
   } finally {
     setIsLoading(false);
   }
@@ -350,6 +361,8 @@ useEffect(() => {
 - **Direct IPC from login pages:** All auth operations MUST go through AuthContext → TauriAuthClient
 - **Hardcoded error messages:** Map AuthError.statusCode to user-friendly messages (see Code Examples)
 - **Loading state in AuthContext only:** Per-operation loading states (send SMS, login, register) should be local to page/component
+- **Using native `<select>` for inputs:** Violates design system — use custom inputs or follow design guide patterns
+- **Hardcoded colors (#fff, bg-blue-500):** MUST use CSS variables from design_guide.md
 
 ---
 
@@ -361,6 +374,8 @@ useEffect(() => {
 | HTTP transport | Fetch/axios with CORS handling | `TauriAuthClient` from Phase 1 (Rust proxy) | Bypasses WebView CORS, system proxy protection |
 | Toast notifications | Custom notification UI | `useToast()` hook from `src/renderer/components/Toast.tsx` | Existing project pattern, consistent styling |
 | Error parsing | Manual error message mapping | `AuthError` from SDK (`statusCode`, `apiMessage`, `isNetworkError()`) | Centralized error handling, type-safe |
+| OTP input logic | Manual paste/focus handling | Pattern from Code Examples section | Standard React pattern with accessibility |
+| Countdown timer | Custom timer logic | `useState` + `useEffect` + `setInterval` (see Code Examples) | Standard React hooks pattern |
 
 **Key insight:** Phase 1 built all the heavy-lifting infrastructure. Phase 2 is purely UI orchestration.
 
@@ -397,6 +412,12 @@ useEffect(() => {
 **Why it happens:** `onPaste` not handled, default behavior pastes entire string into first input.
 **How to avoid:** Handle `onPaste` event, parse clipboard data, distribute to 6 inputs (see Code Examples).
 **Warning signs:** User complaints about typing 6 digits manually.
+
+### Pitfall 6: Not following design system
+**What goes wrong:** Inconsistent colors, spacing, typography across auth pages.
+**Why it happens:** Hardcoding values instead of using CSS variables.
+**How to avoid:** ALWAYS use `var(--xxx)` tokens from design_guide.md.
+**Warning signs:** UI looks out of place compared to Launcher/Settings pages.
 
 ---
 
@@ -514,6 +535,106 @@ export default function App() {
 }
 ```
 
+### Login Page with Design System Compliance
+
+```typescript
+// Source: specs/guides/design_guide.md + auth requirements
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/components/Toast';
+import { Loader2 } from 'lucide-react';
+import { OtpInput } from '@/components/OtpInput';
+import { useState, useEffect } from 'react';
+
+export default function LoginPage({ onLoginSuccess }: { onLoginSuccess: () => void }) {
+  const { login, sendSmsCode } = useAuth();
+  const toast = useToast();
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
+  const [countdown, setCountdown] = useState(0);
+  const [isSending, setIsSending] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleSendSms = async () => {
+    setIsSending(true);
+    try {
+      await sendSmsCode(phone, 'login');
+      setCountdown(60);
+      toast.success('验证码已发送');
+    } catch (error) {
+      toast.error(getErrorMessage(error as AuthError));
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    setIsLoggingIn(true);
+    try {
+      await login(phone, code);
+      toast.success('登录成功');
+      onLoginSuccess();
+    } catch (error) {
+      toast.error(getErrorMessage(error as AuthError));
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  useEffect(() => {
+    if (countdown === 0) return;
+    const timer = setInterval(() => setCountdown(prev => prev - 1), 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-[var(--paper)]">
+      <div className="w-full max-w-md p-8 bg-[var(--paper-elevated)] rounded-[var(--radius-xl)] border border-[var(--line)] shadow-lg">
+        <h1 className="text-2xl font-bold text-[var(--ink)] mb-6">登录 nova-agents</h1>
+        
+        {/* Phone input */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-[var(--ink)] mb-2">手机号</label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full px-4 py-2.5 border border-[var(--line)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--accent)] bg-[var(--paper)] text-[var(--ink)]"
+            placeholder="请输入手机号"
+          />
+        </div>
+
+        {/* SMS code input */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-[var(--ink)] mb-2">验证码</label>
+          <div className="flex gap-2">
+            <OtpInput length={6} onChange={setCode} />
+            <button
+              type="button"
+              onClick={handleSendSms}
+              disabled={countdown > 0 || isSending || !phone}
+              className="px-4 py-2 text-sm font-medium text-[var(--button-primary-text)] bg-[var(--button-primary-bg)] rounded-lg hover:bg-[var(--button-primary-bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 
+               countdown > 0 ? `${countdown}s` : '发送验证码'}
+            </button>
+          </div>
+        </div>
+
+        {/* Login button */}
+        <button
+          type="button"
+          onClick={handleLogin}
+          disabled={isLoggingIn || !phone || code.length !== 6}
+          className="w-full py-2.5 text-sm font-medium text-[var(--button-primary-text)] bg-[var(--button-primary-bg)] rounded-lg hover:bg-[var(--button-primary-bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+        >
+          {isLoggingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : '登录'}
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
 ---
 
 ## State of the Art
@@ -524,10 +645,12 @@ export default function App() {
 | Manual token storage | DiskTokenStorage via atomicModifyConfig | Phase 1 | Tokens persist to config.json, survive app restart |
 | Direct fetch from WebView | TauriAuthClient via Rust proxy | Phase 1 | Bypasses CORS, system proxy protection for localhost |
 | No logout sync | Custom event or SSE broadcast | Phase 2 | All tabs reflect logged-out state immediately |
+| No SMS countdown | 60-second countdown with useState + useEffect | Phase 2 | Prevents SMS abuse, improves UX |
 
 **Deprecated/outdated:**
 - localStorage for token storage (replaced by AppConfig.auth + atomicModifyConfig)
 - Direct SDK AuthClient usage (replaced by TauriAuthClient wrapper)
+- Hardcoded error messages (replaced by AuthError-based mapping)
 
 ---
 
@@ -553,11 +676,21 @@ export default function App() {
    - What's unclear: Whether to show remaining SMS quota in UI (v2 requirement AUTH-14).
    - Recommendation: Defer to v2 (out of scope for Phase 2).
 
+5. **Auth server URL configuration**
+   - What we know: `AppConfig.authServerUrl` stores the URL.
+   - What's unclear: Where in Settings UI should user configure this (dev vs prod).
+   - Recommendation: Add to Settings > General section, below "Theme" and "Auto-start" options.
+
 ---
 
 ## Environment Availability
 
 Step 2.6: SKIPPED (no external dependencies identified for Phase 2 — purely code/UI changes using existing project infrastructure)
+
+**Justification:**
+- All dependencies (React, Tauri, auth-sdk) already in codebase
+- No external tools, CLIs, or services required
+- Pure frontend development using existing patterns
 
 ---
 
@@ -612,19 +745,21 @@ Step 2.6: SKIPPED (no external dependencies identified for Phase 2 — purely co
 - `src/SDK/nova-auth-sdk/src/errors/AuthError.ts` - AuthError class with statusCode, apiMessage, error type checkers
 - `src/SDK/nova-auth-sdk/src/client/AuthClient.ts` - SMS methods (sendSmsCode, smsLogin, smsRegister, getSmsStats)
 - `src/renderer/config/services/appConfigService.ts` - atomicModifyConfig pattern for disk-first writes
-- `src/renderer/context/TabContext.tsx` - Reference pattern for Context architecture
+- `src/renderer/context/TabProvider.tsx` - Reference pattern for Context architecture
 - `src/renderer/App.tsx` - Existing app structure, tab-based navigation
 - `src/renderer/components/Toast.tsx` - useToast hook for error messages
+- `src/renderer/config/types.ts` - AppConfig schema with auth fields (Phase 1)
+- `specs/guides/design_guide.md` - Design system tokens (colors, typography, spacing, buttons)
 
 ### Secondary (MEDIUM confidence)
 
-- `src/renderer/config/types.ts` - AppConfig schema with auth fields (Phase 1)
 - `src/renderer/auth/diskTokenStorage.ts` - DiskTokenStorage implementation (Phase 1)
 - Project CLAUDE.md - Architecture constraints (Rust proxy layer, disk-first config, no direct HTTP)
+- `.claude/skills/ui-ux-pro-max/SKILL.md` - UI/UX best practices (accessibility, touch targets, loading states)
 
 ### Tertiary (LOW confidence)
 
-- None — all research based on existing codebase.
+- None — all research based on existing codebase and official documentation.
 
 ---
 
@@ -632,8 +767,9 @@ Step 2.6: SKIPPED (no external dependencies identified for Phase 2 — purely co
 
 **Confidence breakdown:**
 - Standard Stack: HIGH - all libraries/patterns already in codebase
-- Architecture: HIGH - decisions locked in Phase 1 CONTEXT.md, existing TabProvider pattern to follow
+- Architecture: HIGH - decisions locked in Phase 1, existing TabProvider pattern to follow
 - Pitfalls: MEDIUM - edge cases around multi-tab sync need validation during implementation
+- UI/UX: HIGH - design_guide.md provides comprehensive token system
 
 **Research date:** 2026-04-08
 **Valid until:** 2026-05-08 (30 days - stable domain, React patterns evolve slowly)
