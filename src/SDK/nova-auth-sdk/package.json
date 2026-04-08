@@ -1,0 +1,48 @@
+{
+	"name": "@nova-intelligent/auth-sdk",
+	"version": "0.0.1",
+	"description": "TypeScript SDK for Nova authentication API with OAuth support",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"build": "tsc",
+		"watch": "tsc --watch",
+		"prepublishOnly": "npm run build",
+		"prepack": "npm run build",
+		"version": "npm run build && git add dist"
+	},
+	"keywords": [
+		"authentication",
+		"oauth",
+		"jwt",
+		"nova",
+		"sdk",
+		"typescript",
+		"github",
+		"tauri"
+	],
+	"author": "Nova Core Team",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/tangtianshuo/nova-core.git",
+		"directory": "nova-auth-sdk"
+	},
+	"homepage": "https://github.com/tangtianshuo/nova-core#readme",
+	"bugs": {
+		"url": "https://github.com/tangtianshuo/nova-core/issues"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"devDependencies": {
+		"typescript": "^5.6.0"
+	},
+	"engines": {
+		"node": ">=16.0.0"
+	}
+}

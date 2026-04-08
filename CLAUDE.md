@@ -220,3 +220,312 @@ nova-agents 是 OpenClaw 的**通用 Plugin 适配层**，不是各家 IM 的硬
 - 代理配置：@specs/tech_docs/proxy_config.md
 - Windows 平台适配：@specs/tech_docs/windows_platform_guide.md
 - 设计系统（Token/组件/页面规范）：@specs/guides/design_guide.md
+
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**nova-agents 用户登录注册**
+
+nova-agents 桌面应用的**用户身份认证模块**。基于短信验证码实现用户的登录和注册功能，接入已有的 `@nova-intelligent/auth-sdk`，为桌面客户端提供用户身份体系。
+
+**现状：** nova-agents 是多会话 AI Agent 桌面客户端，无用户身份系统。所有会话共享同一配置，无个人化设置、多用户隔离、订阅管理。
+
+**Core Value:** **用户能够通过手机号 + 短信验证码安全地登录或注册 nova-agents，实现个人身份与工作区的绑定。**
+
+### Constraints
+
+- **架构合规**: HTTP 流量必须经 Rust 代理层 — SDK fetch 需重新封装
+- **无后端自建**: auth-server 是外部服务，只做前端接入
+- **桌面端首次**: 短信验证码交互需适配桌面端 UX（输入框 + 倒计时 + 错误提示）
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:codebase/STACK.md -->
+## Technology Stack
+
+## Languages
+- TypeScript 5.9.3 - Frontend and Bun Sidecar
+- Rust 1.77.2 - Tauri desktop framework
+- JavaScript - Build scripts and CLI tools
+## Runtime
+- Bun 1.3.2 - Agent Runtime Sidecar, Plugin Bridge
+- Node.js bundled - MCP Server execution, npm packages (in `src-tauri/resources/nodejs/`)
+- Git - Required for Claude Code operations (NSIS installer on Windows)
+- Bun 1.3.2 (primary)
+- npm (bundled, for MCP/npx compatibility)
+## Frameworks
+- Tauri v2.9.6 - Desktop application framework
+- React 19.2.0 - Frontend UI framework
+- TypeScript 5.9.3 - Type safety
+- Vite 7.1.12 - Build tool and dev server
+- TailwindCSS 4.1.16 - Utility-first CSS
+- PostCSS 8.5.6 - CSS processing
+- `@anthropic-ai/claude-agent-sdk` 0.2.84 - Claude Agent SDK for AI interactions
+- `@dnd-kit/core` 6.3.1 - Drag and drop
+- `@dnd-kit/sortable` 10.0.0 - Sortable lists
+- `@monaco-editor/react` 4.7.0 - Code editor (Monaco)
+- `react-virtuoso` 4.18.3 - Virtualized lists
+- `react-arborist` 3.4.3 - Tree component
+- `@xterm/xterm` 6.0.0 - Terminal emulator
+- `lucide-react` 0.554.0 - Icons
+- `react-markdown` 10.1.0 - Markdown rendering
+- `remark-gfm` 4.0.1 - GitHub Flavored Markdown
+- `remark-math` 6.0.0 - Math support (KaTeX)
+- `rehype-katex` 7.0.1 - KaTeX HTML rendering
+- `mermaid` 11.12.2 - Diagrams
+- `react-syntax-highlighter` 16.1.0 - Code syntax highlighting
+- `portable-pty` 0.8 - PTY support (Rust)
+- `@xterm/addon-fit` 0.11.0 - Terminal fit addon
+- `@xterm/addon-web-links` 0.12.0 - Clickable links in terminal
+- `tauri-plugin-fs` 2.4.5 - File system access
+- `tauri-plugin-dialog` 2.6.0 - Native dialogs
+- `tauri-plugin-shell` 2 - Shell command execution
+- `tauri-plugin-autostart` 2.5.1 - Auto-start on login
+- `tauri-plugin-notification` 2.3.3 - System notifications
+- `tauri-plugin-process` 2.3.1 - Process management
+- `tauri-plugin-updater` 2.10 - Auto-updates
+- `tauri-plugin-log` 2 - Logging
+- `tauri-plugin-localhost` 2 - Localhost server
+## Rust Dependencies
+- `tokio` 1.49.0 (rt, sync, time, macros) - Async runtime
+- `serde` 1.0 - Serialization
+- `serde_json` 1.0 - JSON handling
+- `reqwest` 0.13.1 (stream, json, blocking, multipart, socks) - HTTP client
+- `futures` 0.3 - Async utilities
+- `futures-util` 0.3.31 - Async stream utilities
+- `axum` 0.8 (json, tokio, query, http1) - HTTP framework
+- `tokio-tungstenite` 0.24 (native-tls) - WebSocket
+- `cron` 0.15 - Cron expression parsing
+- `chrono` 0.4 (serde) - Date/time
+- `chrono-tz` 0.10 - Timezone support
+- `cron-parser` 5.5.0 - Cron schedule parsing
+- `portable-pty` 0.8 - Cross-platform PTY
+- `uuid` 1.11 (v4) - UUID generation
+- `dirs` 6.0 - Platform directories
+- `which` 8.0.0 - Command finder
+- `base64` 0.22 - Base64 encoding
+- `pulldown-cmark` 0.12 - Markdown parsing
+- `prost` 0.13 - Protocol buffers
+- `libc` 0.2.180 - C library bindings
+## Configuration
+- `.env.example` - Template for environment variables
+- `vite.config.ts` - Vite build configuration with proxy rules
+- `tauri.conf.json` - Tauri app configuration (window, security, bundling)
+- `tailwind.config.ts` - Tailwind CSS configuration
+- `tsconfig.json` - TypeScript configuration
+- `tsconfig.json` - Strict TypeScript with path aliases (`@/` maps to `src/renderer`)
+- `vite.config.ts` - Build targets, chunk size limits (2500KB for large deps)
+## Platform Requirements
+- Bun 1.3.2+
+- Node.js (for some npm-based tooling)
+- Rust 1.77.2+
+- Windows 10+ (NSIS installer)
+- macOS 13.0+ (DMG)
+- Bundled runtimes included (no external dependencies needed)
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+## Naming Patterns
+### Files
+- **TypeScript/React**: kebab-case
+- **Rust**: snake_case
+### Functions and Variables
+- **TypeScript**: camelCase
+- **React Components**: PascalCase
+- **React Hooks**: camelCase with `use` prefix
+- **Rust Functions**: snake_case
+- **Constants**: SCREAMING_SNAKE_CASE in TypeScript when module-level
+### Types and Interfaces
+- **TypeScript**: PascalCase with descriptive suffixes
+- **Rust Structs/Enums**: PascalCase
+## Code Style
+### Formatting
+- `@ianvs/prettier-plugin-sort-imports` for import sorting
+- `prettier-plugin-tailwindcss` for Tailwind class sorting
+- `eslint-config-prettier` to disable ESLint formatting rules
+- Print width: 100 (default)
+- Single quotes: enabled
+- Trailing commas: all
+### Linting
+- `@typescript-eslint/no-explicit-any`: error
+- `@typescript-eslint/no-unused-vars`: error (with `_` ignore pattern)
+- `react/prop-types`: off (TypeScript handles this)
+- `react-hooks/rules-of-hooks`: enabled
+- `react-hooks/exhaustive-deps`: enabled
+### TypeScript
+- Strict mode enabled via `typescript-eslint`
+- No `any` type allowed (error level)
+- Unused variables must be prefixed with `_` or listed in ignore patterns
+- Generic type parameters used for JSON parsing: `parsePartialJson<T>()`
+### React Patterns
+- Dual Context pattern for separation of data and actions
+- `useConfigData()` and `useConfigActions()` as separate consumers
+- Legacy `useConfig()` as compatibility wrapper
+- Custom hooks must start with `use`
+- Dependencies in `useEffect`/`useCallback`/`useMemo` must be exhaustive
+- Memoization with `useMemo` for context values to prevent consumer re-renders
+## Import Organization
+- `@/` maps to `src/renderer/`
+- `@anthropic-ai/claude-agent-sdk` for SDK imports
+## Error Handling
+### TypeScript/JavaScript
+- `ErrorBoundary` component at app root (`AppErrorBoundary.tsx`)
+- Toast notifications for user-facing errors (`useToast()`)
+- Console error logging with `[ComponentName]` prefix
+### Rust
+## Logging Conventions
+### Frontend (React)
+- `[REACT]` — Frontend logs
+- `[BUN]` — Bun Sidecar logs
+- `[RUST]` — Rust layer logs
+### Backend (Bun Sidecar)
+- Via `~/.nova-agents/logs/unified-{YYYY-MM-DD}.log`
+- Via `[Logger]` prefixed messages in console
+### Rust
+## Function Design
+### Size Guidelines
+- Functions should be small and focused
+- If a function exceeds ~100 lines, consider splitting
+- React components: separate logic into custom hooks
+### Parameters
+- Explicit parameter types (no `any`)
+- Optional parameters have `?` suffix
+- Use object destructuring for functions with >3 parameters
+### Return Values
+- Always explicit return types for exported functions
+- Use `null` instead of `undefined` for "no value"
+- Arrays should be typed as `T[]` not `Array<T>` (project preference)
+## Module Design
+### Exports
+- Named exports preferred over default exports (better refactoring)
+- Barrel files (`index.ts`) for public API surface of modules
+- Re-exports through `index.ts` for public API
+### File Organization
+## Git Workflow
+### Branch Strategy
+- `dev/x.x.x` — Development branches
+- `main` — Production branch (never commit directly)
+### Commit Messages
+### Pre-commit Checklist
+### Merging to Main
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+## Pattern Overview
+- **Session-centric sidecar model** — Each AI session runs in its own Bun process, isolated per session
+- **Owner-based lifecycle** — Tabs, CronTasks, BackgroundCompletions, and Agents can all "own" a sidecar; it stops when all owners release it
+- **Rust proxy layer** — All frontend HTTP/SSE traffic routes through Rust (reqwest) to prevent system proxy interference with localhost
+- **Dual runtime** — Bun runs the agent SDK and core logic; Node.js runs MCP servers and community packages
+- **Plugin bridge** — OpenClaw plugins run in a separate Bun process with SDK shim for compatibility
+## Layers
+- Purpose: User interface, state management, chat UI
+- Location: `src/renderer/`
+- Contains: Pages (Chat, Settings, Launcher), Components, Context providers, API clients
+- Depends on: Tauri IPC (`invoke`), Tauri events
+- Used by: End users
+- Purpose: Desktop integration, process management, HTTP/SSE proxy, security boundary
+- Location: `src-tauri/src/`
+- Contains: SidecarManager, CronTaskManager, TerminalManager, IM/Agent management, SSE proxy
+- Depends on: Tauri framework, tokio, reqwest
+- Used by: Frontend (via invoke/events), Bun Sidecar (via HTTP)
+- Purpose: Claude Agent SDK runtime, tool execution, MCP server management
+- Location: `src/server/`
+- Contains: agent-session.ts, admin-api.ts, tools/, openai-bridge/, plugin-bridge/
+- Depends on: Bun runtime, Claude Agent SDK
+- Used by: Rust via HTTP (proxy)
+- Purpose: Load OpenClaw community plugins (Feishu/WeChat/QQ)
+- Location: `src/server/plugin-bridge/`
+- Contains: Bridge index, SDK shim, MCP handler
+- Used by: Rust IM/Agent management
+## Data Flow
+## Communication Patterns
+- Command-based RPC from frontend to Rust
+- Examples: `cmd_ensure_session_sidecar`, `cmd_create_cron_task`, `cmd_terminal_create`
+- Synchronous request/response
+- Server-sent events from Rust to frontend
+- Examples: `terminal:data:{id}`, `sse:{tabId}:{event}`
+- Used for streaming responses and terminal I/O
+- Rust `reqwest` client connects to Bun Sidecar HTTP server
+- All connections use `local_http` module (`.no_proxy()` for localhost)
+- Used for: API calls, health checks
+- Bun Sidecar runs SSE server (`src/server/sse.ts`)
+- Rust `sse_proxy` module streams events to frontend
+- Format: `sse:{tabId}:{eventName}`
+- Events: `chat:message-chunk`, `chat:status`, `chat:complete`, etc.
+- Bun Sidecar calls `127.0.0.1:{management_port}/api/im/wake`
+- Rust `management_api.rs` handles internal IPC
+- Used for: IM bot wake, config reload
+## Key Architectural Patterns
+```rust
+```
+- One Sidecar per Session, but multiple owners can share it
+- Port allocation from 31415-31915
+- Health monitoring with auto-restart
+```rust
+```
+- `ensure_session_sidecar` adds an owner
+- `release_session_sidecar` removes an owner
+- Sidecar stops when `owners` becomes empty
+- Each Chat tab wrapped in TabProvider
+- Own SSE connection, message history, API client
+- Uses `useTabState()` hook for tab-scoped operations
+- Settings/Launcher use Global Sidecar via `apiFetch.ts`
+| Module | Function | Purpose |
+|--------|----------|---------|
+| `local_http.rs` | `builder()`, `sse_client()` | Creates reqwest clients with `.no_proxy()` for localhost |
+| `process_cmd.rs` | `new()` | Creates Child processes with `CREATE_NO_WINDOW` flag |
+| `proxy_config.rs` | `apply_to_subprocess()` | Injects `HTTP_PROXY`/`NO_PROXY` into subprocess env |
+| `system_binary.rs` | `find()` | Searches system PATH reliably for tools |
+```typescript
+```
+- Maintains client connections per tab
+- Last-value cache for `chat:status` events
+- SILENT_EVENTS filter for log noise reduction
+- L1: Base identity (always)
+- L2: Interaction channel (desktop/im/agent-channel) - mutually exclusive
+- L3: Scenario context (cron-task/heartbeat) - additive
+## Entry Points
+- `src-tauri/src/main.rs` — Tauri app entry, calls `lib::run()`
+- `src-tauri/src/lib.rs` — App builder with all plugins, commands, setup logic
+- `src/renderer/main.tsx` — React mount
+- `src/renderer/App.tsx` — Root component with routing
+- `src/server/index.ts` — Main Bun server, HTTP/SSE endpoints
+- `src-tauri/src/cli.rs` — Detects CLI mode, spawns Bun script
+- `src/cli/myagents.ts` — CLI script, parses args, calls Admin API
+## Error Handling
+- `AppErrorBoundary` catches React errors
+- `try/catch` around API calls with user-facing toast errors
+- SSE connection auto-reconnect
+- `Result` types with `?` operator propagation
+- `ulog_error!` macro for unified logging
+- Health monitors detect and restart unhealthy sidecars
+- Timeout protection (`awaitSessionTermination(10_000)`) for session cleanup
+- SDK subprocess managed with timeout/abort signals
+- `abortPersistentSession()` for clean generator termination
+- Uncaught errors logged via UnifiedLogger
+## Cross-Cutting Concerns
+## Key File Locations
+<!-- GSD:architecture-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd:quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd:debug` for investigation and bug fixing
+- `/gsd:execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+<!-- GSD:profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd:profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- GSD:profile-end -->

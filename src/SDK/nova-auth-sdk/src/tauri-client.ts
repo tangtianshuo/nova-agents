@@ -58,7 +58,7 @@ export class TauriAuthClient {
     method: string,
     body?: object,
     headers?: Record<string, string>
-  ): Promise<Response> {
+  ): Promise<HttpResponseWrapper> {
     const url = `${this.authServerUrl}${endpoint}`;
     const httpRequest: HttpRequest = {
       url,
@@ -81,15 +81,33 @@ export class TauriAuthClient {
     }
   }
 
+  /**
+   * Create AuthError from HttpResponseWrapper
+   */
+  private async throwAuthError(response: HttpResponseWrapper): Promise<never> {
+    let apiMessage: string | undefined;
+    try {
+      const data = await response.json() as { error?: string };
+      apiMessage = data.error;
+    } catch {
+      apiMessage = String(response.status);
+    }
+    throw new AuthError(
+      `Authentication failed: ${apiMessage || response.status}`,
+      response.status,
+      apiMessage
+    );
+  }
+
   async sendSmsCode(phone: string, type: 'login' | 'register'): Promise<SmsSendResponse> {
     const response = await this.proxyRequest('/auth/sms/send', 'POST', { phone, type } satisfies SmsSendRequest);
-    if (!response.ok) throw await AuthError.fromResponse(response);
+    if (!response.ok) await this.throwAuthError(response);
     return response.json() as Promise<SmsSendResponse>;
   }
 
   async smsLogin(phone: string, code: string): Promise<SmsLoginResponse> {
     const response = await this.proxyRequest('/auth/sms/login', 'POST', { phone, code } satisfies SmsLoginRequest);
-    if (!response.ok) throw await AuthError.fromResponse(response);
+    if (!response.ok) await this.throwAuthError(response);
     const data = await response.json() as SmsLoginResponse;
     await this.tokenManager.setToken(data.accessToken);
     await this.tokenManager.setRefreshToken(data.refreshToken);
@@ -98,7 +116,7 @@ export class TauriAuthClient {
 
   async smsRegister(phone: string, code: string, username: string): Promise<SmsRegisterResponse> {
     const response = await this.proxyRequest('/auth/sms/register', 'POST', { phone, code, username } satisfies SmsRegisterRequest);
-    if (!response.ok) throw await AuthError.fromResponse(response);
+    if (!response.ok) await this.throwAuthError(response);
     const data = await response.json() as SmsRegisterResponse;
     await this.tokenManager.setToken(data.accessToken);
     await this.tokenManager.setRefreshToken(data.refreshToken);
@@ -107,7 +125,7 @@ export class TauriAuthClient {
 
   async getSmsStats(phone: string): Promise<SmsStatsResponse> {
     const response = await this.proxyRequest(`/auth/sms/stats?phone=${encodeURIComponent(phone)}`, 'GET');
-    if (!response.ok) throw await AuthError.fromResponse(response);
+    if (!response.ok) await this.throwAuthError(response);
     return response.json() as Promise<SmsStatsResponse>;
   }
 
@@ -115,7 +133,7 @@ export class TauriAuthClient {
     const token = await this.tokenManager.getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
     const response = await this.proxyRequest('/auth/validate', 'POST', undefined, headers);
-    if (!response.ok) throw await AuthError.fromResponse(response);
+    if (!response.ok) await this.throwAuthError(response);
     return response.json() as Promise<ValidateTokenResponse>;
   }
 
@@ -126,7 +144,7 @@ export class TauriAuthClient {
     const response = await this.proxyRequest('/auth/refresh', 'POST', { refreshToken });
     if (!response.ok) {
       await this.tokenManager.clearAll();
-      throw await AuthError.fromResponse(response);
+      await this.throwAuthError(response);
     }
 
     const data = await response.json() as RefreshTokenResponse;
@@ -140,10 +158,9 @@ export class TauriAuthClient {
     const refreshToken = await this.tokenManager.getRefreshToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
-    let response: Response;
     if (token) {
-      response = await this.proxyRequest('/auth/logout', 'POST', { refreshToken }, headers);
-      if (!response.ok) throw await AuthError.fromResponse(response);
+      const response = await this.proxyRequest('/auth/logout', 'POST', { refreshToken }, headers);
+      if (!response.ok) await this.throwAuthError(response);
     }
 
     await this.tokenManager.clearAll();

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { TauriAuthClient } from './tauri-client';
+import type { TokenStorage } from './types';
 
 // Mock @tauri-apps/api/core
 const mockInvoke = mock(async () => {
@@ -10,12 +11,31 @@ mock.module('@tauri-apps/api/core', () => ({
   invoke: mockInvoke,
 }));
 
+// In-memory token storage for tests
+class MockTokenStorage implements TokenStorage {
+  private store: Map<string, string> = new Map();
+
+  async getItem(key: string): Promise<string | null> {
+    return this.store.get(key) ?? null;
+  }
+
+  async setItem(key: string, value: string): Promise<void> {
+    this.store.set(key, value);
+  }
+
+  async removeItem(key: string): Promise<void> {
+    this.store.delete(key);
+  }
+}
+
 describe('TauriAuthClient', () => {
   const baseUrl = 'http://localhost:3000';
   let client: TauriAuthClient;
+  let storage: MockTokenStorage;
 
   beforeEach(() => {
-    client = new TauriAuthClient(baseUrl);
+    storage = new MockTokenStorage();
+    client = new TauriAuthClient(baseUrl, storage);
     mockInvoke.mockClear();
   });
 
@@ -230,7 +250,7 @@ describe('TauriAuthClient', () => {
         })
       });
       // The Authorization header should be set
-      const lastCall = mockInvoke.mock.calls[mockInvoke.mock.calls.length - 1];
+      const lastCall = mockInvoke.mock.calls[mockInvoke.mock.calls.length - 1] as any;
       expect(lastCall[1].request.headers?.Authorization).toBe('Bearer test-token');
     });
   });

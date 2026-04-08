@@ -1,6 +1,6 @@
 import { atomicModifyConfig } from '../config/services/appConfigService';
 import type { AuthData } from '../config/types';
-import type { TokenStorage } from '../../../SDK/nova-auth-sdk/src/types/common.types';
+import type { TokenStorage } from '../../SDK/nova-auth-sdk/src/types/common.types';
 
 const TOKEN_KEY = 'nova_access_token';
 const REFRESH_TOKEN_KEY = 'nova_refresh_token';
