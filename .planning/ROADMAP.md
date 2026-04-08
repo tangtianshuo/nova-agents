@@ -50,8 +50,8 @@
 7. Errors display clear messages (invalid code, expired code, rate limited, network error)
 
 **Plans:**
-1/2 plans executed
-- [ ] 02-02-PLAN.md - LoginPage + RegisterPage with countdown and error handling
+2/2 plans executed
+- [x] 02-02-PLAN.md - LoginPage + RegisterPage with countdown and error handling
 
 ---
 
@@ -60,7 +60,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 1/1 | Complete   | 2026-04-08 |
-| 2. Core Flow | 1/2 | In Progress|  |
+| 2. Core Flow | 2/2 | Complete   | 2026-04-08 |
 
 ---
 
@@ -93,6 +93,8 @@
   - Modifies: App.tsx (add AuthProvider, extend tab views)
   - Requirements: AUTH-08, AUTH-04, UX-01, UX-02
 
-- [ ] 02-02-PLAN.md - LoginPage + RegisterPage
+- [x] 02-02-PLAN.md - LoginPage + RegisterPage
   - Creates: LoginPage.tsx, RegisterPage.tsx
+  - Modifies: App.tsx (add login/register routing), tab.ts (extend view type)
   - Requirements: AUTH-05, AUTH-10, UX-02, UX-03
+  - Status: Complete (2026-04-08)
