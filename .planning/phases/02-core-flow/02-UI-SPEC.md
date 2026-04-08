@@ -50,23 +50,28 @@ Declared values (multiples of 4, from existing CSS variables):
 
 ## Typography
 
+**Maximum 4 font sizes, 2 font weights** (per design checker constraint):
+
 | Role | Size | Weight | Line Height | CSS Variable |
 |------|------|--------|-------------|--------------|
-| Body | 16px | 400 (normal) | 1.6 | `--text-base` |
-| Label | 14px | 500 (medium) | 1.5 | `--text-sm` |
-| Heading (H2) | 20px | 600 (semibold) | 1.4 | `--text-xl` |
-| Heading (H3) | 18px | 600 (semibold) | 1.5 | `--text-lg` |
-| Button text | 13px | 500 (medium) | — | `--text-sm` (for toolbar buttons) |
 | Page title | 28px | 600 (semibold) | 1.2 | `--text-3xl` |
-
-**Source**: `--text-*` tokens in `src/renderer/index.css` lines 259-267.
+| Heading | 20px | 600 (semibold) | 1.4 | `--text-xl` |
+| Body | 16px | 400 (normal) | 1.6 | `--text-base` |
+| Label/Button | 14px | 500 (medium) | 1.5 | `--text-sm` |
 
 **Usage in Phase 2**:
-- Login/Register page titles: `--text-3xl` (28px, semibold)
+- Login/Register page titles: `--text-3xl` (28px, semibold) — **focal point**
 - Form labels: `--text-sm` (14px, medium) — follow Settings panel pattern
 - Input placeholders: `--text-sm` (14px) with `--ink-muted` color
-- Button text: 13px for toolbar buttons, 14px for primary/secondary buttons
+- Button text: `--text-sm` (14px) for primary/secondary buttons
 - Error messages: `--text-sm` (14px) with `--error` color
+
+**Weight hierarchy** (2 weights max):
+- Weight 600 (semibold): Page title, Heading, emphasized labels
+- Weight 400 (normal): Body text, input text
+- Weight 500 (medium): Buttons, form labels (intermediate emphasis)
+
+**Source**: `--text-*` tokens in `src/renderer/index.css` lines 259-267.
 
 ---
 
@@ -100,6 +105,12 @@ Declared values (multiples of 4, from existing CSS variables):
 - **Error states** (`--error`): Invalid phone format, wrong verification code, expired code, network errors
 - **Success states** (`--success`): Login/register success toast, code sent confirmation
 - **Warning states** (`--warning`): SMS rate limit reached (60s countdown), resend unavailable
+
+---
+
+## Visual Focal Point
+
+**Primary visual anchor on Login/Register pages**: The page title (手机号登录 / 注册新账号) is the focal point, drawing the eye first. It uses `--text-3xl` (28px, semibold) at the top of the card, establishing the page purpose before the user scans to the form fields below.
 
 ---
 
@@ -273,7 +284,7 @@ Declared values (multiples of 4, from existing CSS variables):
 
 ### 7. Logout Flow
 
-**Trigger**: Settings page → "退出登录" button (or keyboard shortcut)
+**Trigger**: Settings page — "退出登录" button (or keyboard shortcut)
 
 **UX**: Instant logout, no confirmation dialog (per RESEARCH.md line 547)
 - Button: Ghost style with `text-[var(--error)] hover:bg-[var(--error-bg)]`
@@ -368,7 +379,7 @@ Declared values (multiples of 4, from existing CSS variables):
 
 **Mobile breakpoint**: 768px (Tailwind `md:`)
 
-**Desktop layout** (≥768px):
+**Desktop layout** (>=768px):
 - Login/Register card: Centered, `max-w-md` (448px)
 - Full-screen overlay style (same as ConfirmDialog)
 
@@ -424,7 +435,7 @@ Declared values (multiples of 4, from existing CSS variables):
 ## Checker Sign-Off
 
 - [ ] Dimension 1 Copywriting: PASS (all CTAs, error messages, labels defined)
-- [ ] Dimension 2 Visuals: PASS (component specs, layout, responsive design defined)
+- [ ] Dimension 2 Visuals: PASS (component specs, layout, responsive design defined; focal point declared)
 - [ ] Dimension 3 Color: PASS (60/30/10 split, semantic colors defined)
 - [ ] Dimension 4 Typography: PASS (4 sizes, 2 weights, line heights specified)
 - [ ] Dimension 5 Spacing: PASS (8-point scale, exceptions documented)
