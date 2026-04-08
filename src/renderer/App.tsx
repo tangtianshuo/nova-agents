@@ -8,6 +8,7 @@ import BugReportOverlay from '@/components/BugReportOverlay';
 import CustomTitleBar from '@/components/CustomTitleBar';
 import TabBar from '@/components/TabBar';
 import TabProvider from '@/context/TabProvider';
+import { AuthProvider } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
 import { useUpdater } from '@/hooks/useUpdater';
 import { useTrayEvents } from '@/hooks/useTrayEvents';
@@ -100,7 +101,21 @@ const MemoizedTabContent = memo(function TabContent({
       className={`absolute inset-0 ${isActive ? '' : 'pointer-events-none invisible'}`}
       style={isActive ? undefined : { contentVisibility: 'hidden' }}
     >
-      {tab.view === 'launcher' ? (
+      {tab.view === 'login' ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold mb-4">登录</h2>
+            <p className="text-[var(--ink-muted)]">LoginPage will be implemented in Plan 02-02</p>
+          </div>
+        </div>
+      ) : tab.view === 'register' ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold mb-4">注册</h2>
+            <p className="text-[var(--ink-muted)]">RegisterPage will be implemented in Plan 02-02</p>
+          </div>
+        </div>
+      ) : tab.view === 'launcher' ? (
         <Launcher
           onLaunchProject={onLaunchProject}
           isStarting={isLoading}
@@ -1587,174 +1602,177 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col relative overflow-hidden">
-      {/* Background Orbs for Glassmorphism Effect */}
-      <div className="orb-container">
-        <div className="orb orb-1"></div>
-        <div className="orb orb-2"></div>
-        <div className="orb orb-3"></div>
-      </div>
-      <div className="grid-pattern"></div>
+    <AuthProvider>
+      {/* Auth-protected content */}
+      <div className="flex h-screen flex-col relative overflow-hidden">
+        {/* Background Orbs for Glassmorphism Effect */}
+        <div className="orb-container">
+          <div className="orb orb-1"></div>
+          <div className="orb orb-2"></div>
+          <div className="orb orb-3"></div>
+        </div>
+        <div className="grid-pattern"></div>
 
-      {/* Chrome-style titlebar with tabs */}
-      <CustomTitleBar
-        onSettingsClick={handleOpenSettings}
-        onOpenBugReport={() => setShowBugReport(true)}
-        updateReady={updateReady}
-        updateVersion={updateVersion}
-        onRestartAndUpdate={() => void restartAndUpdate()}
-      >
-        <TabBar
-          tabs={tabs}
-          activeTabId={activeTabId}
-          onSelectTab={handleSelectTab}
-          onCloseTab={handleCloseTab}
-          onNewTab={handleNewTab}
-          onReorderTabs={handleReorderTabs}
-        />
-      </CustomTitleBar>
-
-      {/* Tab content */}
-      <div ref={contentRef} className="relative flex-1 overflow-hidden">
-        {tabs.map((tab) => (
-          <MemoizedTabContent
-            key={tab.id}
-            tab={tab}
-            isActive={tab.id === activeTabId}
-            isLoading={loadingTabs[tab.id] ?? false}
-            error={tabErrors[tab.id] ?? null}
-            onLaunchProject={handleLaunchProject}
-            onBack={handleBackToLauncher}
-            onSwitchSession={handleSwitchSession}
-            onNewSession={handleNewSession}
-            onUpdateGenerating={updateTabGenerating}
-            onUpdateTitle={updateTabTitle}
-            onUpdateUnread={updateTabUnread}
-            onRenameSession={handleRenameSession}
-            onForkSession={handleForkSession}
-            onUpdateSessionId={updateTabSessionId}
-            onClearInitialMessage={clearInitialMessage}
-            onClearJoinedExistingSidecar={clearJoinedExistingSidecar}
-            settingsInitialSection={tab.view === 'settings' ? settingsInitialSection : undefined}
-            settingsInitialMcpId={tab.view === 'settings' ? settingsInitialMcpId : undefined}
-            onSettingsSectionChange={handleSettingsSectionChange}
-            updateReady={updateReady}
-            updateVersion={updateVersion}
-            updateChecking={updateChecking}
-            updateDownloading={updateDownloading}
-            onCheckForUpdate={checkForUpdate}
-            onRestartAndUpdate={handleRestartAndUpdate}
-          />
-        ))}
-      </div>
-
-      {/* Exit confirmation dialog for running cron tasks */}
-      {exitConfirmState && (
-        <ConfirmDialog
-          title="退出应用"
-          message={`有 ${exitConfirmState.runningTaskCount} 个循环任务正在运行中。退出后任务将被停止。确定要退出吗？`}
-          confirmText="退出"
-          cancelText="取消"
-          confirmVariant="danger"
-          onConfirm={() => {
-            exitConfirmState.resolve(true);
-            setExitConfirmState(null);
-          }}
-          onCancel={() => {
-            exitConfirmState.resolve(false);
-            setExitConfirmState(null);
-          }}
-        />
-      )}
-
-      {/* Windows: startup dialog for pending update from previous session */}
-      {pendingUpdateOnStartup && (
-        <ConfirmDialog
-          title="发现新版本"
-          message={`最新版本 v${pendingUpdateOnStartup} 已下载完成，是否立即安装？`}
-          confirmText="安装"
-          cancelText="稍后"
-          confirmVariant="primary"
-          onConfirm={() => {
-            dismissPendingUpdate();
-            void restartAndUpdate();
-          }}
-          onCancel={dismissPendingUpdate}
-        />
-      )}
-
-      {/* Warning: ~/.claude/settings.json env overrides detected */}
-      {claudeEnvOverride && (
-        <div
-          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm"
-          onMouseDown={(e) => { if (e.target === e.currentTarget && !claudeEnvClearing) setClaudeEnvOverride(null); }}
+        {/* Chrome-style titlebar with tabs */}
+        <CustomTitleBar
+          onSettingsClick={handleOpenSettings}
+          onOpenBugReport={() => setShowBugReport(true)}
+          updateReady={updateReady}
+          updateVersion={updateVersion}
+          onRestartAndUpdate={() => void restartAndUpdate()}
         >
-          <div className="glass-panel w-full max-w-sm">
-            <div className="border-b border-[var(--line)] px-5 py-4">
-              <div className="text-[14px] font-semibold text-[var(--ink)]">检测到全局配置覆盖</div>
-            </div>
-            <div className="px-5 py-4">
-              <p className="text-[13px] leading-relaxed text-[var(--ink-muted)]">
-                {`~/.claude/settings.json 中检测到${claudeEnvOverride.baseUrl ? ` ANTHROPIC_BASE_URL = ${claudeEnvOverride.baseUrl.length > 60 ? claudeEnvOverride.baseUrl.slice(0, 60) + '...' : claudeEnvOverride.baseUrl}` : ''}${claudeEnvOverride.baseUrl && claudeEnvOverride.hasApiKey ? '，' : ''}${claudeEnvOverride.hasApiKey ? 'ANTHROPIC_API_KEY' : ''}，该配置会覆盖 NovaAgents 的供应商设置，导致所有请求发送到非预期地址。是否清除？`}
-              </p>
-            </div>
-            <div className="flex items-center justify-between border-t border-[var(--line)] px-5 py-3">
-              <button
-                type="button"
-                disabled={claudeEnvClearing}
-                className="text-[12px] text-[var(--ink-faint)] transition-colors hover:text-[var(--ink-muted)] disabled:opacity-50"
-                onClick={() => {
-                  void updateConfig({ dismissClaudeEnvWarning: true });
-                  setClaudeEnvOverride(null);
-                }}
-              >
-                不再提示
-              </button>
-              <div className="flex gap-2">
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onSelectTab={handleSelectTab}
+            onCloseTab={handleCloseTab}
+            onNewTab={handleNewTab}
+            onReorderTabs={handleReorderTabs}
+          />
+        </CustomTitleBar>
+
+        {/* Tab content */}
+        <div ref={contentRef} className="relative flex-1 overflow-hidden">
+          {tabs.map((tab) => (
+            <MemoizedTabContent
+              key={tab.id}
+              tab={tab}
+              isActive={tab.id === activeTabId}
+              isLoading={loadingTabs[tab.id] ?? false}
+              error={tabErrors[tab.id] ?? null}
+              onLaunchProject={handleLaunchProject}
+              onBack={handleBackToLauncher}
+              onSwitchSession={handleSwitchSession}
+              onNewSession={handleNewSession}
+              onUpdateGenerating={updateTabGenerating}
+              onUpdateTitle={updateTabTitle}
+              onUpdateUnread={updateTabUnread}
+              onRenameSession={handleRenameSession}
+              onForkSession={handleForkSession}
+              onUpdateSessionId={updateTabSessionId}
+              onClearInitialMessage={clearInitialMessage}
+              onClearJoinedExistingSidecar={clearJoinedExistingSidecar}
+              settingsInitialSection={tab.view === 'settings' ? settingsInitialSection : undefined}
+              settingsInitialMcpId={tab.view === 'settings' ? settingsInitialMcpId : undefined}
+              onSettingsSectionChange={handleSettingsSectionChange}
+              updateReady={updateReady}
+              updateVersion={updateVersion}
+              updateChecking={updateChecking}
+              updateDownloading={updateDownloading}
+              onCheckForUpdate={checkForUpdate}
+              onRestartAndUpdate={handleRestartAndUpdate}
+            />
+          ))}
+        </div>
+
+        {/* Exit confirmation dialog for running cron tasks */}
+        {exitConfirmState && (
+          <ConfirmDialog
+            title="退出应用"
+            message={`有 ${exitConfirmState.runningTaskCount} 个循环任务正在运行中。退出后任务将被停止。确定要退出吗？`}
+            confirmText="退出"
+            cancelText="取消"
+            confirmVariant="danger"
+            onConfirm={() => {
+              exitConfirmState.resolve(true);
+              setExitConfirmState(null);
+            }}
+            onCancel={() => {
+              exitConfirmState.resolve(false);
+              setExitConfirmState(null);
+            }}
+          />
+        )}
+
+        {/* Windows: startup dialog for pending update from previous session */}
+        {pendingUpdateOnStartup && (
+          <ConfirmDialog
+            title="发现新版本"
+            message={`最新版本 v${pendingUpdateOnStartup} 已下载完成，是否立即安装？`}
+            confirmText="安装"
+            cancelText="稍后"
+            confirmVariant="primary"
+            onConfirm={() => {
+              dismissPendingUpdate();
+              void restartAndUpdate();
+            }}
+            onCancel={dismissPendingUpdate}
+          />
+        )}
+
+        {/* Warning: ~/.claude/settings.json env overrides detected */}
+        {claudeEnvOverride && (
+          <div
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm"
+            onMouseDown={(e) => { if (e.target === e.currentTarget && !claudeEnvClearing) setClaudeEnvOverride(null); }}
+          >
+            <div className="glass-panel w-full max-w-sm">
+              <div className="border-b border-[var(--line)] px-5 py-4">
+                <div className="text-[14px] font-semibold text-[var(--ink)]">检测到全局配置覆盖</div>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[13px] leading-relaxed text-[var(--ink-muted)]">
+                  {`~/.claude/settings.json 中检测到${claudeEnvOverride.baseUrl ? ` ANTHROPIC_BASE_URL = ${claudeEnvOverride.baseUrl.length > 60 ? claudeEnvOverride.baseUrl.slice(0, 60) + '...' : claudeEnvOverride.baseUrl}` : ''}${claudeEnvOverride.baseUrl && claudeEnvOverride.hasApiKey ? '，' : ''}${claudeEnvOverride.hasApiKey ? 'ANTHROPIC_API_KEY' : ''}，该配置会覆盖 NovaAgents 的供应商设置，导致所有请求发送到非预期地址。是否清除？`}
+                </p>
+              </div>
+              <div className="flex items-center justify-between border-t border-[var(--line)] px-5 py-3">
                 <button
                   type="button"
-                  onClick={() => setClaudeEnvOverride(null)}
                   disabled={claudeEnvClearing}
-                  className="rounded-full bg-[var(--button-secondary-bg)] px-4 py-1.5 text-[12px] font-semibold text-[var(--button-secondary-text)] transition-colors hover:bg-[var(--button-secondary-bg-hover)] disabled:opacity-50"
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  disabled={claudeEnvClearing}
-                  className="flex items-center gap-1.5 rounded-full bg-[var(--error)] px-4 py-1.5 text-[12px] font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-50"
+                  className="text-[12px] text-[var(--ink-faint)] transition-colors hover:text-[var(--ink-muted)] disabled:opacity-50"
                   onClick={() => {
-                    setClaudeEnvClearing(true);
-                    void apiPostJson('/api/claude-settings/clear-env', {}).then(() => {
-                      setClaudeEnvOverride(null);
-                    }).catch((err) => {
-                      console.error('[App] Failed to clear claude settings env:', err);
-                      setClaudeEnvOverride(null);
-                    }).finally(() => {
-                      setClaudeEnvClearing(false);
-                    });
+                    void updateConfig({ dismissClaudeEnvWarning: true });
+                    setClaudeEnvOverride(null);
                   }}
                 >
-                  {claudeEnvClearing && <Loader2 className="h-3 w-3 animate-spin" />}
-                  清除
+                  不再提示
                 </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setClaudeEnvOverride(null)}
+                    disabled={claudeEnvClearing}
+                    className="rounded-full bg-[var(--button-secondary-bg)] px-4 py-1.5 text-[12px] font-semibold text-[var(--button-secondary-text)] transition-colors hover:bg-[var(--button-secondary-bg-hover)] disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={claudeEnvClearing}
+                    className="flex items-center gap-1.5 rounded-full bg-[var(--error)] px-4 py-1.5 text-[12px] font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-50"
+                    onClick={() => {
+                      setClaudeEnvClearing(true);
+                      void apiPostJson('/api/claude-settings/clear-env', {}).then(() => {
+                        setClaudeEnvOverride(null);
+                      }).catch((err) => {
+                        console.error('[App] Failed to clear claude settings env:', err);
+                        setClaudeEnvOverride(null);
+                      }).finally(() => {
+                        setClaudeEnvClearing(false);
+                      });
+                    }}
+                  >
+                    {claudeEnvClearing && <Loader2 className="h-3 w-3 animate-spin" />}
+                    清除
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Bug report overlay triggered from titlebar feedback button */}
-      {showBugReport && (
-        <BugReportOverlay
-          onClose={() => setShowBugReport(false)}
-          onNavigateToProviders={() => { setShowBugReport(false); handleOpenSettings('providers'); }}
-          appVersion={appVersion}
-          providers={appProviders}
-          apiKeys={appApiKeys}
-          providerVerifyStatus={appProviderVerifyStatus}
-        />
-      )}
-    </div>
+        {/* Bug report overlay triggered from titlebar feedback button */}
+        {showBugReport && (
+          <BugReportOverlay
+            onClose={() => setShowBugReport(false)}
+            onNavigateToProviders={() => { setShowBugReport(false); handleOpenSettings('providers'); }}
+            appVersion={appVersion}
+            providers={appProviders}
+            apiKeys={appApiKeys}
+            providerVerifyStatus={appProviderVerifyStatus}
+          />
+        )}
+      </div>
+    </AuthProvider>
   );
 }
