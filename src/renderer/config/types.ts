@@ -355,6 +355,25 @@ export interface AppConfig {
    *  Written by rebuildAndPersistAvailableProviders() whenever provider config changes.
    *  Read lazily by Rust IM command handlers. */
   availableProvidersJson?: string;
+
+  // ===== Auth Configuration (v1.0 SMS Auth) =====
+  /** Auth server base URL (default: http://localhost:3000) */
+  authServerUrl?: string;
+  /** Persisted auth tokens and user info */
+  auth?: AuthData;
+}
+
+/**
+ * Authentication data stored in AppConfig.auth
+ */
+export interface AuthData {
+  accessToken: string;
+  refreshToken: string;
+  user?: {
+    userId: string;
+    username: string;
+  };
+  expiresAt?: string; // ISO timestamp
 }
 
 /**
