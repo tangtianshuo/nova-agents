@@ -19,6 +19,8 @@ import { useTabSwipeGesture } from '@/hooks/useTabSwipeGesture';
 import Chat from '@/pages/Chat';
 import Launcher from '@/pages/Launcher';
 import Settings from '@/pages/Settings';
+import LoginPage from '@/pages/LoginPage';
+import RegisterPage from '@/pages/RegisterPage';
 import {
   type Project,
   type Provider,
@@ -102,19 +104,21 @@ const MemoizedTabContent = memo(function TabContent({
       style={isActive ? undefined : { contentVisibility: 'hidden' }}
     >
       {tab.view === 'login' ? (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold mb-4">登录</h2>
-            <p className="text-[var(--ink-muted)]">LoginPage will be implemented in Plan 02-02</p>
-          </div>
-        </div>
+        <LoginPage
+          isActive={isActive}
+          onLoginSuccess={() => {
+            // Switch to launcher after login
+            onBack();
+          }}
+        />
       ) : tab.view === 'register' ? (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold mb-4">注册</h2>
-            <p className="text-[var(--ink-muted)]">RegisterPage will be implemented in Plan 02-02</p>
-          </div>
-        </div>
+        <RegisterPage
+          isActive={isActive}
+          onRegisterSuccess={() => {
+            // Switch to launcher after registration
+            onBack();
+          }}
+        />
       ) : tab.view === 'launcher' ? (
         <Launcher
           onLaunchProject={onLaunchProject}
@@ -1459,6 +1463,30 @@ export default function App() {
       window.removeEventListener(CUSTOM_EVENTS.JUMP_TO_TAB, handleJumpToTab as EventListener);
     };
   }, []);
+
+  // Listen for navigation events between Login and Register pages
+  useEffect(() => {
+    const activeTabId = activeTabIdRef.current;
+    if (!activeTabId) return;
+
+    const handleNavigateToRegister = () => {
+      console.log('[App] Navigate to register');
+      setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, view: 'register' } : t));
+    };
+
+    const handleNavigateToLogin = () => {
+      console.log('[App] Navigate to login');
+      setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, view: 'login' } : t));
+    };
+
+    window.addEventListener(CUSTOM_EVENTS.NAVIGATE_TO_REGISTER, handleNavigateToRegister);
+    window.addEventListener(CUSTOM_EVENTS.NAVIGATE_TO_LOGIN, handleNavigateToLogin);
+
+    return () => {
+      window.removeEventListener(CUSTOM_EVENTS.NAVIGATE_TO_REGISTER, handleNavigateToRegister);
+      window.removeEventListener(CUSTOM_EVENTS.NAVIGATE_TO_LOGIN, handleNavigateToLogin);
+    };
+  }, [setTabs]);
 
   // Listen for LAUNCH_BUG_REPORT custom event (AI-powered bug reporting)
   useEffect(() => {

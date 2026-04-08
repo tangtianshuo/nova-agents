@@ -1,9 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import { TauriAuthClient } from '@/SDK/nova-auth-sdk/src/tauri-client';
-import { AuthError } from '@/SDK/nova-auth-sdk/src/errors';
-import { DiskTokenStorage } from '@/renderer/auth/diskTokenStorage';
-import { loadAppConfig, atomicModifyConfig } from '@/renderer/config/services/appConfigService';
-import { useToast } from '@/components/Toast';
+import { TauriAuthClient } from '../../SDK/nova-auth-sdk/src/tauri-client';
+import { AuthError } from '../../SDK/nova-auth-sdk/src/errors';
+import { DiskTokenStorage } from '../auth/diskTokenStorage';
+import { loadAppConfig, atomicModifyConfig } from '../config/services/appConfigService';
+import { useToast } from '../components/Toast';
 
 // ============================================================
 // Types
@@ -180,10 +180,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     try {
-      const response = await authClient.smsLogin(phone, code);
+      await authClient.smsLogin(phone, code);
+
+      // Get user info by validating token
+      const userResponse = await authClient.validateToken();
 
       setAuthState({
-        user: response.user || null,
+        user: userResponse.user || null,
         isLoading: false,
         isAuthenticated: true,
       });
@@ -202,10 +205,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     try {
-      const response = await authClient.smsRegister(phone, code, username);
+      await authClient.smsRegister(phone, code, username);
+
+      // Get user info by validating token
+      const userResponse = await authClient.validateToken();
 
       setAuthState({
-        user: response.user || null,
+        user: userResponse.user || null,
         isLoading: false,
         isAuthenticated: true,
       });

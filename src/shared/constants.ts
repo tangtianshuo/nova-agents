@@ -84,6 +84,10 @@ export const CUSTOM_EVENTS = {
     LAUNCH_BUG_REPORT: 'launch-bug-report',
     /** Fired when a session title changes (auto-generated or user rename) — triggers refetch in history/task center */
     SESSION_TITLE_CHANGED: 'session-title-changed',
+    /** Fired to navigate from Login page to Register page */
+    NAVIGATE_TO_REGISTER: 'navigate-to-register',
+    /** Fired to navigate from Register page to Login page */
+    NAVIGATE_TO_LOGIN: 'navigate-to-login',
     // CONFIG_CHANGED removed — ConfigProvider shares state via Context, no DOM event bridge needed
     // Note: CRON_TASK_STOPPED event removed
     // With Session-centric Sidecar (Owner model), stopping a cron task only releases
