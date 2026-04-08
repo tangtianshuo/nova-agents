@@ -49,7 +49,9 @@
 6. All auth operations show loading states during network requests
 7. Errors display clear messages (invalid code, expired code, rate limited, network error)
 
-**Plans:** TBD
+**Plans:**
+- [ ] 02-01-PLAN.md - AuthContext + OtpInput + App.tsx integration
+- [ ] 02-02-PLAN.md - LoginPage + RegisterPage with countdown and error handling
 
 ---
 
@@ -58,7 +60,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 1/1 | Complete   | 2026-04-08 |
-| 2. Core Flow | 0/1 | Not started | - |
+| 2. Core Flow | 0/2 | Not started | - |
 
 ---
 
@@ -81,3 +83,16 @@
 | UX-01 | Phase 2 |
 | UX-02 | Phase 2 |
 | UX-03 | Phase 2 |
+
+## Plan List
+
+### Phase 2 Plans
+
+- [ ] 02-01-PLAN.md - AuthContext + OtpInput + App.tsx integration
+  - Creates: AuthContext.tsx, OtpInput.tsx
+  - Modifies: App.tsx (add AuthProvider, extend tab views)
+  - Requirements: AUTH-08, AUTH-04, UX-01, UX-02
+
+- [ ] 02-02-PLAN.md - LoginPage + RegisterPage
+  - Creates: LoginPage.tsx, RegisterPage.tsx
+  - Requirements: AUTH-05, AUTH-10, UX-02, UX-03
