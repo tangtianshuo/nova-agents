@@ -1,62 +1,80 @@
-# Phase 1: Foundation - Context
+# Phase 1: Foundation & Static Sections - Context
 
-**Gathered:** 2026-04-08
+**Gathered:** 2026-04-09
 **Status:** Ready for planning
 
 <domain>
 ## Phase Boundary
 
-Phase 1 delivers: TauriAuthClient wrapper, DiskTokenStorage adapter, AppConfig.auth schema, configurable API baseURL. No UI in this phase. The goal is end-to-end working auth HTTP transport with disk-backed token storage.
+Phase 1 delivers the component architecture foundation for Settings page refactoring. This includes:
+1. Creating `src/renderer/pages/Settings/` directory structure (sections/, components/, hooks/)
+2. Building SettingsLayout (container) and SettingsSidebar (navigation) components
+3. Refactoring index.tsx as a composition root (~200 lines)
+4. Migrating AccountSection and AboutSection from the 5707-line Settings.tsx
+
+**No complex business logic in this phase** — only layout and static content sections. Provider management, MCP tools, and dialogs are in later phases.
 
 </domain>
 
 <decisions>
 ## Implementation Decisions
 
-### Auth API URL Configuration
-- **D-01:** Auth API baseURL stored in `AppConfig.authServerUrl`. Default to `http://localhost:3000` for dev. Setting persists to disk via `atomicModifyConfig`.
+### Directory Structure
+- **D-01:** Follow the design document structure exactly: `Settings/index.tsx`, `SettingsLayout.tsx`, `SettingsSidebar.tsx`, `sections/`, `components/`, `hooks/`. No deviation from `docs/settings-componentization.md` §3.1.
 
-### Token Storage Schema
-- **D-02:** `AppConfig.auth` field stores `{ accessToken, refreshToken, user?: { userId, username }, expiresAt? }`. Tokens stored as plain strings (config.json is user-writable, not encrypted).
-- **D-03:** Custom `DiskTokenStorage` implements SDK `TokenStorage` interface (`getItem/setItem/removeItem`). Reads/writes via `atomicModifyConfig` to avoid race conditions.
+### Layout Component Architecture
+- **D-02:** SettingsLayout is a pure layout container (no business logic). It manages the two-column layout (sidebar + content area) and passes `activeSection` state down to children.
+- **D-03:** SettingsSidebar is a controlled component receiving `activeSection` and `onSectionChange` as props. Navigation state lives in the parent (Settings/index.tsx), not in the sidebar itself.
 
-### SDK HTTP Interception
-- **D-04:** Create `TauriAuthClient` class in `src/SDK/nova-auth-sdk/src/tauri-client.ts`. Wraps all SDK HTTP calls (sendSmsCode, smsLogin, smsRegister, etc.) via `invoke('cmd_proxy_http')` → Rust → reqwest → auth server. SDK internal `fetch()` is never called directly.
-- **D-05:** `TauriAuthClient` takes `authServerUrl` in constructor. Each method constructs full URL and uses the proxy invoke.
+### Navigation State Management
+- **D-04:** `activeSection` state stored in Settings/index.tsx using `useState('general'` as default). This is lifted state because both SettingsSidebar and the content area need it.
+- **D-05:** Section switching is triggered by sidebar button clicks calling `onSectionChange(section)`. No routing — this is internal Settings page navigation only.
 
-### Rust Proxy Route
-- **D-06:** Auth endpoints: `/auth/sms/send`, `/auth/sms/login`, `/auth/sms/register`, `/auth/sms/stats`, `/auth/refresh`, `/auth/logout`. Route pattern: `POST/GET /auth-proxy/{path}` → reqwest → `{authServerUrl}/{path}`.
-- **D-07:** Rust side: add `proxy_http_request` route registration for `/auth-proxy/*` path prefix in `sse_proxy.rs` or `lib.rs`.
+### Static Section Migration Approach
+- **D-06:** **Extract-as-is principle** — Copy AccountSection and AboutSection code verbatim from Settings.tsx without refactoring logic. Only wrap in function components and export. Fix any direct state references to use props where needed.
+- **D-07:** Section components receive their data from useConfig (global) via parent props. No local state duplication — read config from props, let callbacks handle updates.
 
-### Auth State on App Startup
-- **D-08:** On app load, `AuthContext` reads tokens from `AppConfig.auth`. If valid `accessToken` exists, validate with backend via `validateToken()`. If refresh needed, use `refreshToken()`. Fallback to logged-out state if both fail.
+### Props Interface Design
+- **D-08:** All components have explicit TypeScript interfaces exported. Example: `interface SettingsLayoutProps { activeSection: SettingsSection; onSectionChange: (section: SettingsSection) => void; children: React.ReactNode; config: AppConfig; }`
+- **D-09:** `SettingsSection` type defined as union: `'general' | 'providers' | 'mcp' | 'skills' | 'sub-agents' | 'agent' | 'usage-stats' | 'about' | 'account'`. This matches the current implementation.
+
+### Import Path Updates
+- **D-10:** After creating Settings/index.tsx, update the main App.tsx or wherever Settings.tsx is imported. Change from `import Settings from '@/pages/Settings'` to `import Settings from '@/pages/Settings/index'` (or adjust the export in Settings/index.tsx to maintain backward compatibility).
 
 ### Claude's Discretion
-- Session-sidecar integration with auth user token is deferred to Phase 2 (after foundation). Phase 1 focuses purely on HTTP transport + storage.
-- Specific error handling messages for each auth API error code — deferred to Phase 2.
+- **File naming:** Use kebab-case for component files (SettingsLayout.tsx, SettingsSidebar.tsx) to match project conventions.
+- **Inline styling vs CSS:** Continue using TailwindCSS classes as in the original Settings.tsx. No CSS modules or styled-components.
+- **Error boundaries:** Defer error boundary setup to later phases. Phase 1 components are simple and won't crash.
+- **Testing:** No unit tests in Phase 1. Testing comes in Phase 4 (Dialogs & QA).
 
 </decisions>
 
 <canonical_refs>
 ## Canonical References
 
-### Architecture & Config
-- `src/renderer/config/types.ts` — AppConfig schema, extend with `authServerUrl` and `auth` fields
-- `src/renderer/config/services/appConfigService.ts` — `atomicModifyConfig` pattern for disk-first writes
-- `src-tauri/src/sse_proxy.rs` — existing `proxy_http_request` command to wrap
-- `src-tauri/src/lib.rs` — where to register new proxy route handlers
+**Downstream agents MUST read these before planning or implementing.**
 
-### SDK Source
-- `src/SDK/nova-auth-sdk/src/client/AuthClient.ts` — source of truth for API endpoints and types
-- `src/SDK/nova-auth-sdk/src/types/auth.types.ts` — SmsSendRequest, SmsLoginRequest, SmsRegisterRequest, etc.
-- `src/SDK/nova-auth-sdk/src/utils/tokenManager.ts` — TokenStorage interface to implement
+### Design Document
+- `docs/settings-componentization.md` — Complete design specification. Read §3 (Architecture Design) and §4 (Component Design) before implementing.
 
-### Design System
-- `specs/guides/design_guide.md` — CSS token usage if any UI is needed (Phase 2)
+### Research
+- `.planning/research/ARCHITECTURE.md` — Component hierarchy, boundaries, data flow patterns
+- `.planning/research/FEATURES.md` — Table stakes features, component patterns, state management strategies
+- `.planning/research/PITFALLS.md` — Common React componentization mistakes to avoid (over-extraction, useEffect deps breaking)
 
 ### Project Constraints
-- `CLAUDE.md` — Rust proxy layer constraint (no direct HTTP from WebView)
-- `specs/tech_docs/architecture.md` — Tab-scoped vs global state patterns
+- `CLAUDE.md` — Core architectural constraints (no direct HTTP from WebView, Rust proxy layer mandatory)
+- `specs/tech_docs/architecture.md` — Session-centric sidecar model, Tab-scoped vs global state
+- `specs/tech_docs/react_stability_rules.md` — React stability rules (useCallback, useMemo, Context value stability)
+- `specs/guides/design_guide.md` — Design system (Paper/Ink colors, button specs, layout patterns)
+
+### Source Code
+- `src/renderer/pages/Settings.tsx` — Current monolithic implementation (5707 lines). Read first 500 lines to understand imports, types, and structure.
+
+### Existing Patterns
+- `src/renderer/components/GlobalSkillsPanel.tsx` — Example of extracted section component
+- `src/renderer/components/GlobalAgentsPanel.tsx` — Example of extracted section component
+- `src/renderer/context/TabContext.tsx` — Pattern for creating scoped context (reference for SettingsSectionContext if needed)
 
 </canonical_refs>
 
@@ -64,26 +82,37 @@ Phase 1 delivers: TauriAuthClient wrapper, DiskTokenStorage adapter, AppConfig.a
 ## Existing Code Insights
 
 ### Reusable Assets
-- `atomicModifyConfig` in `appConfigService.ts` — thread-safe disk config writes, use for token persistence
-- `proxy_http_request` in `sse_proxy.rs` — existing HTTP proxy, extend with auth route prefix
-- SDK's `TokenStorage` interface in `tokenManager.ts` — implement to replace localStorage default
+- `useConfig()` hook — Global config management (providers, apiKeys, mcpServers, projects). All Settings sections read from this.
+- `CustomSelect` component (`src/renderer/components/CustomSelect.tsx`) — Dropdown pattern, may be used in SettingsSidebar for section switching if needed.
 
 ### Established Patterns
-- Config extensions use `Record<string, T>` or optional fields on `AppConfig` interface
-- Tauri invoke wrapper pattern: `invoke<T>('cmd_name', { param })`
+- **Component exports:** Pages use default export: `export default function Settings() { ... }`
+- **Icon imports:** From `lucide-react` — maintain this pattern
+- **TypeScript:** Strict mode enabled, all props must have explicit interfaces
+- **TailwindCSS:** All styling via utility classes, no CSS modules
 
 ### Integration Points
-- New `TauriAuthClient` instantiated in `AuthContext` (Phase 2), not in Phase 1
-- Phase 1 only produces `src/SDK/nova-auth-sdk/src/tauri-client.ts` and `src/SDK/nova-auth-sdk/src/utils/diskTokenStorage.ts`
+- **App.tsx** — Updates Settings import path after index.tsx created
+- **useConfig** — All sections read config from this global hook
+- **Navigation** — Settings is accessible from Launcher and main app navigation
 
 </code_context>
 
 <specifics>
 ## Specific Ideas
 
-- Use SDK's `SmsSendRequest`, `SmsLoginRequest`, `SmsRegisterRequest` types directly
-- Phone number: no country code selector in Phase 1 — plain text input, assume +86 China for now
-- Error handling: Phase 1 returns raw SDK errors; Phase 2 wraps with user-friendly messages
+### From Design Document
+- SettingsLayout exact structure: `<div className="flex h-full bg-[var(--paper)]"> <Sidebar /> <Content /> </div>`
+- SettingsSidebar navigation: List of sections with icons, active section highlighted
+- AccountSection: User info card, logout button (already exists in Settings.tsx around line 2250-2320)
+- AboutSection: App version info, links (already exists in Settings.tsx around line 5400-5500)
+
+### Target File Sizes (from design doc)
+- Settings/index.tsx: ~200 lines (composition root)
+- SettingsLayout.tsx: ~150 lines
+- SettingsSidebar.tsx: ~200 lines
+- AccountSection.tsx: ~100 lines
+- AboutSection.tsx: ~200 lines
 
 </specifics>
 
@@ -97,4 +126,4 @@ None — discussion stayed within Phase 1 scope.
 ---
 
 *Phase: 01-foundation*
-*Context gathered: 2026-04-08*
+*Context gathered: 2026-04-09*
