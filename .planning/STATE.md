@@ -1,101 +1,189 @@
----
-gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-current_phase: 2
-status: in_progress
-last_updated: "2026-04-08T13:28:23.000Z"
-progress:
-  total_phases: 2
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
----
+# Settings Componentization - Project State
 
-# STATE: nova-agents SMS Auth
-
-**Milestone:** v1.0 SMS Auth
-**Current phase:** 2
-**Started:** 2026-04-08
+**Project:** nova-agents Settings 页面组件化重构
+**Version:** v1.0
+**Last Updated:** 2026-04-09
 
 ---
 
 ## Project Reference
 
-**Core Value:** 用户能够通过手机号 + 短信验证码安全地登录或注册 nova-agents，实现个人身份与工作区的绑定。
+### Core Value
 
-**Current Focus:** Phase 01 — foundation
+**开发者能够高效维护 Settings 页面，单文件代码量 <500 行，组件职责清晰，状态局部化。**
+
+### Current Focus
+
+Phase 1: Foundation & Static Sections - 建立组件化基础设施
+
+### Project Context
+
+**Problem:** Settings.tsx 是一个 5707 行的单文件组件，包含 9 个设置区块、30+ useState、复杂的状态管理和交互逻辑，可维护性低，修改风险高。
+
+**Solution:** 系统化组件化重构，采用 React 19 + TypeScript 5.9 最佳实践，拆分为模块化架构（Settings/ 目录结构，共享组件层，业务逻辑 Hooks 层）。
+
+**Constraints:**
+- 功能完整性 — 所有功能必须保持，不能有任何回归
+- 渐进迁移 — 分阶段迁移，每阶段可独立验收
+- UI 一致性 — 拆分后 UI 与原设计完全一致
+- 类型安全 — 所有 Props 接口必须有明确类型定义
 
 ---
 
 ## Current Position
 
-Phase: 02 (core-flow) — IN PROGRESS
-Plan: 02 (login-registration) — COMPLETE
-| Field | Value |
-|-------|-------|
-| Phase | 2 - Core Flow |
-| Plan | 02 - User Login/Registration |
-| Status | Complete |
-| Progress | 100% |
+**Phase:** Phase 1 - Foundation & Static Sections
 
-**Phase Progress Bar:** [████████████░] 67% (2/3 plans complete)
+**Plan:** TBD (awaiting `/gsd:plan-phase 1`)
+
+**Status:** Not started
+
+**Progress Bar:** ▱▱▱▱ 0% (0/4 phases complete)
 
 ---
 
 ## Performance Metrics
 
-| Metric | Value |
-|--------|-------|
-| Total Phases | 2 |
-| Completed Phases | 1 |
-| Total Requirements | 13 |
-| Mapped Requirements | 13 |
-| Total Plans | 3 |
-| Completed Plans | 3 |
+**Requirements Coverage:** 27/27 (100%)
 
----
+**Files to Modify:** 1 main file (Settings.tsx) + 30+ new files
 
-## Plan Execution History
+**Estimated Lines of Code:** ~5000 lines (existing) → ~6000 lines (with better structure)
 
-| Phase | Plan | Duration | Tasks | Status | Date |
-|-------|------|----------|-------|--------|------|
-| 01 | 01 (foundation) | 120s | 3 | Complete | 2026-04-08 |
-| 02 | 01 (auth-context) | 120s | 3 | Complete | 2026-04-08 |
-| 02 | 02 (login-registration) | 232s | 2 | Complete | 2026-04-08 |
+**Target File Size:** <500 lines per file
 
 ---
 
 ## Accumulated Context
 
-### Decisions
+### Key Decisions
 
-- Using `@nova-intelligent/auth-sdk` (already in codebase)
-- SDK HTTP calls wrapped via `invoke('proxy_http_request')`
-- Token storage backed by `AppConfig.auth` in `config.json`
-- AuthContext placed at App level, above TabProvider
-- [Phase 01]: SDK HTTP via Rust proxy: TauriAuthClient uses invoke('proxy_http_request')
-- [Phase 01]: Token storage keys: nova_access_token and nova_refresh_token match SDK TokenManager constants
-- [Phase 02-core-flow]: Auth state initialization: validate token on mount
-- [Phase 02-core-flow]: Multi-tab logout sync: window.dispatchEvent + event listeners
-- [Phase 02-core-flow]: OtpInput paste handler: extract first 6 digits, fill all inputs
-- [Phase 02-core-flow]: AuthProvider placement: wrap main app container, not entire document
-- [Phase 02-core-flow P02]: Login/register navigation: custom events (navigate-to-register/login) with App.tsx listeners
-- [Phase 02-core-flow P02]: Auth success flow: call validateToken after login/register to retrieve user info
-- [Phase 02-core-flow P02]: SMS countdown: 60-second timer starts only after successful API response
+| Decision | Rationale | Outcome |
+|----------|-----------|---------|
+| 组件化拆分 | 单文件过大，维护困难 | ✓ 采用 |
+| 状态局部化 | 减少 Props 传递，提高可维护性 | ✓ 采用 |
+| 共享组件 | ProviderCard、McpServerCard 等 | ✓ 采用 |
+| Hook 封装 | useProviderVerify、useMcpServers 等 | ✓ 采用 |
+| 渐进迁移 | 4 个阶段，每阶段可独立验收 | ✓ 采用 |
 
-### Open Questions
+### Architecture Decisions
 
-- Auth server URL for dev vs prod environments
-- Token expiry duration
-- Multi-tab sync approach (SSE broadcast vs storage events)
+**Directory Structure:**
+```
+src/renderer/pages/Settings/
+├── index.tsx                    # Main entry, composition root
+├── SettingsLayout.tsx           # Layout container
+├── SettingsSidebar.tsx          # Navigation sidebar
+├── sections/                    # Settings sections
+│   ├── AccountSection.tsx
+│   ├── GeneralSection.tsx
+│   ├── ProvidersSection.tsx
+│   ├── McpSection.tsx
+│   └── AboutSection.tsx
+├── components/                  # Shared components
+│   ├── ProviderCard.tsx
+│   ├── McpServerCard.tsx
+│   ├── ApiKeyInput.tsx
+│   ├── VerifyStatusIndicator.tsx
+│   └── dialogs/                # Dialog components
+│       ├── CustomProviderDialog.tsx
+│       ├── CustomMcpDialog.tsx
+│       ├── PlaywrightConfigPanel.tsx
+│       ├── EdgeTtsConfigPanel.tsx
+│       └── GeminiImageConfigPanel.tsx
+└── hooks/                       # Business logic hooks
+    ├── useProviderVerify.ts
+    ├── useMcpServers.ts
+    └── useSubscription.ts
+```
 
-### Blockers
+**State Management Strategy:**
+- **Global State:** useConfig (providers, apiKeys, mcpServers)
+- **Section-Level State:** useState (local form state, UI toggles)
+- **Callback Props:** Parent-child communication (explicit data flow)
+- **Custom Hooks:** Business logic encapsulation
 
-- None identified
+### Technical Constraints
+
+**Must Follow:**
+- Project React Stability Rules (specs/tech_docs/react_stability_rules.md)
+- Design System (specs/guides/design_guide.md)
+- Architecture Patterns (specs/tech_docs/architecture.md)
+
+**Type Safety:**
+- TypeScript strict mode enabled
+- All components must have explicit Props interfaces
+- No `any` types allowed
+- ESLint react-hooks/exhaustive-deps must pass
+
+### Risk Mitigation
+
+**High-Risk Areas:**
+1. **useEffect Dependencies Breaking** - When extracting logic, dependency arrays become incomplete
+   - **Prevention:** Exhaustive deps rule, stabilize callbacks with useCallback
+
+2. **Silent Functionality Regressions** - Features silently break during refactoring
+   - **Prevention:** Test-first refactoring, incremental migration, feature audit checklist
+
+3. **Over-Extraction** - Creating unnecessary complexity
+   - **Prevention:** 3 questions rule, minimum 50-80 line threshold
 
 ---
 
 ## Session Continuity
 
-**Last updated:** 2026-04-08
+### Last Action
+
+Initialized roadmap with 4 phases based on research/SUMMARY.md and coarse granularity setting.
+
+### Next Step
+
+Run `/gsd:plan-phase 1` to create detailed plans for Phase 1: Foundation & Static Sections
+
+### Active Work
+
+None yet (awaiting phase planning)
+
+### Blockers
+
+None
+
+---
+
+## Traceability
+
+All 27 v1 requirements mapped to phases in REQUIREMENTS.md traceability section.
+
+**Coverage:** 27/27 (100%)
+
+| Phase | Requirements Count |
+|-------|-------------------|
+| Phase 1 | 6 (ARCH: 4, SECTION: 2) |
+| Phase 2 | 7 (SHARE: 4, HOOK: 3) |
+| Phase 3 | 2 (SECTION: 2) |
+| Phase 4 | 12 (SECTION: 1, DIALOG: 5, QA: 6) |
+
+---
+
+## Notes
+
+**Research Completed:**
+- Stack research (React 19, TypeScript 5.9, component patterns)
+- Features research (table stakes, differentiators, anti-patterns)
+- Architecture research (component hierarchy, state management)
+- Pitfalls research (12 identified pitfalls with prevention strategies)
+
+**Confidence Level:** HIGH
+- Well-established React patterns
+- No new libraries needed
+- Project already has extracted component examples
+- Clear migration path with incremental validation
+
+**Gaps to Address:**
+- Provider verification flow details (before Phase 3)
+- MCP enable/disable async operation management (before Phase 3)
+- Form validation patterns for custom dialogs (before Phase 4)
+
+---
+
+*State initialized: 2026-04-09*

@@ -99,24 +99,24 @@
 | SHARE-03 | 提取 ApiKeyInput 组件 | Phase 2 |
 | SHARE-04 | 提取 VerifyStatusIndicator 组件 | Phase 2 |
 | SECTION-01 | 创建 AccountSection | Phase 1 |
-| SECTION-02 | 创建 GeneralSection | Phase 5 |
+| SECTION-02 | 创建 GeneralSection | Phase 4 |
 | SECTION-03 | 创建 ProvidersSection | Phase 4 |
 | SECTION-04 | 创建 McpSection | Phase 4 |
 | SECTION-05 | 创建 AboutSection | Phase 1 |
-| HOOK-01 | 提取 useProviderVerify hook | Phase 3 |
-| HOOK-02 | 提取 useMcpServers hook | Phase 3 |
-| HOOK-03 | 提取 useSubscription hook | Phase 3 |
-| DIALOG-01 | 提取 CustomProviderDialog | Phase 6 |
-| DIALOG-02 | 提取 CustomMcpDialog | Phase 6 |
-| DIALOG-03 | 提取 PlaywrightConfigPanel | Phase 6 |
-| DIALOG-04 | 提取 EdgeTtsConfigPanel | Phase 6 |
-| DIALOG-05 | 提取 GeminiImageConfigPanel | Phase 6 |
-| QA-01 | 功能回归测试 | Phase 7 |
-| QA-02 | TypeScript 无 any 类型 | Phase 7 |
-| QA-03 | 单文件 <500 行 | Phase 7 |
-| QA-04 | ESLint 通过 | Phase 7 |
-| QA-05 | Props 接口定义 | Phase 7 |
-| QA-06 | 遵循 Stability Rules | Phase 7 |
+| HOOK-01 | 提取 useProviderVerify hook | Phase 2 |
+| HOOK-02 | 提取 useMcpServers hook | Phase 2 |
+| HOOK-03 | 提取 useSubscription hook | Phase 2 |
+| DIALOG-01 | 提取 CustomProviderDialog | Phase 4 |
+| DIALOG-02 | 提取 CustomMcpDialog | Phase 4 |
+| DIALOG-03 | 提取 PlaywrightConfigPanel | Phase 4 |
+| DIALOG-04 | 提取 EdgeTtsConfigPanel | Phase 4 |
+| DIALOG-05 | 提取 GeminiImageConfigPanel | Phase 4 |
+| QA-01 | 功能回归测试 | Phase 4 |
+| QA-02 | TypeScript 无 any 类型 | Phase 4 |
+| QA-03 | 单文件 <500 行 | Phase 4 |
+| QA-04 | ESLint 通过 | Phase 4 |
+| QA-05 | Props 接口定义 | Phase 4 |
+| QA-06 | 遵循 Stability Rules | Phase 4 |
 
 ---
 

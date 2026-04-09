@@ -224,19 +224,20 @@ nova-agents 是 OpenClaw 的**通用 Plugin 适配层**，不是各家 IM 的硬
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
-**nova-agents 用户登录注册**
+**Settings 页面组件化拆分**
 
-nova-agents 桌面应用的**用户身份认证模块**。基于短信验证码实现用户的登录和注册功能，接入已有的 `@nova-intelligent/auth-sdk`，为桌面客户端提供用户身份体系。
+nova-agents 设置页面的**组件化重构项目**。将当前 5707 行的 Settings.tsx 单文件组件拆分为模块化、可维护的组件架构。
 
-**现状：** nova-agents 是多会话 AI Agent 桌面客户端，无用户身份系统。所有会话共享同一配置，无个人化设置、多用户隔离、订阅管理。
+**现状：** Settings.tsx 是一个巨大的单文件组件（5707 行），包含 9 个设置区块、30+ useState、复杂的状态管理和交互逻辑，可维护性低，修改风险高。
 
-**Core Value:** **用户能够通过手机号 + 短信验证码安全地登录或注册 nova-agents，实现个人身份与工作区的绑定。**
+**Core Value:** **开发者能够高效维护 Settings 页面，单文件代码量 <500 行，组件职责清晰，状态局部化。**
 
 ### Constraints
 
-- **架构合规**: HTTP 流量必须经 Rust 代理层 — SDK fetch 需重新封装
-- **无后端自建**: auth-server 是外部服务，只做前端接入
-- **桌面端首次**: 短信验证码交互需适配桌面端 UX（输入框 + 倒计时 + 错误提示）
+- **功能完整性** — 所有功能必须保持，不能有任何回归
+- **渐进迁移** — 分阶段迁移，每阶段可独立验收
+- **UI 一致性** — 拆分后 UI 与原设计完全一致
+- **类型安全** — 所有 Props 接口必须有明确类型定义
 <!-- GSD:project-end -->
 
 <!-- GSD:stack-start source:codebase/STACK.md -->
