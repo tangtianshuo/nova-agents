@@ -1,77 +1,145 @@
-# Requirements: nova-agents SMS Auth
+# Settings 组件化拆分需求
 
-**Defined:** 2026-04-08
-**Core Value:** 用户能够通过手机号 + 短信验证码安全地登录或注册 nova-agents，实现个人身份与工作区的绑定。
+**项目:** nova-agents Settings 页面重构
+**版本:** v1.0
+**创建日期:** 2026-04-09
 
-## v1 Requirements
+---
 
-### Authentication
+## v1 需求
 
-- [x] **AUTH-01**: 用户可使用手机号 + 短信验证码注册新账号（输入手机号→发送验证码→输入验证码→输入用户名→注册成功）
-- [x] **AUTH-02**: 用户可使用手机号 + 短信验证码登录已有账号（输入手机号→发送验证码→输入验证码→登录成功）
-- [x] **AUTH-03**: 登录态持久化 — 重启应用后保持登录状态（Token 存入磁盘）
-- [x] **AUTH-04**: 用户可登出账号（清除 Token，所有 Tab 同步更新）
-- [ ] **AUTH-05**: 短信发送频率限制 — 60s 倒计时防刷，显示剩余时间
-- [x] **AUTH-06**: SDK HTTP 通过 Rust 代理层 — TauriAuthClient 封装，路由经 `invoke('proxy_http_request')`
-- [x] **AUTH-07**: 自定义 DiskTokenStorage — 实现 SDK TokenStorage 接口，backend 为 `~/.nova-agents/config.json`，与现有 disk-first 模式一致
-- [x] **AUTH-08**: AuthContext 全局态 — 置于 App.tsx 根层级，位于 TabProvider 之上，所有 Tab 共享
-- [x] **AUTH-09**: Auth API baseURL 可配置 — 支持开发/生产环境不同地址
-- [ ] **AUTH-10**: 错误处理完善 — 验证码错误/过期/频率限制/网络错误 有明确提示
+### 架构与布局 (ARCH)
 
-### User Experience
+- [ ] **ARCH-01**: 创建 Settings/ 目录结构（sections/、components/、hooks/）
+- [ ] **ARCH-02**: 创建 SettingsLayout 组件（布局容器，~150 行）
+- [ ] **ARCH-03**: 创建 SettingsSidebar 组件（侧边栏导航，~200 行）
+- [ ] **ARCH-04**: 重构 index.tsx 为组合根组件（~200 行）
 
-- [x] **UX-01**: 验证码输入支持粘贴
-- [x] **UX-02**: 加载状态 — 发送验证码/登录/注册 过程中有 loading 状态
-- [ ] **UX-03**: 登录注册页面 — 独立路由，与现有 Chat/Settings/Launcher 并列
+### 共享组件 (SHARE)
 
-## v2 Requirements
+- [ ] **SHARE-01**: 提取 ProviderCard 组件（供应商卡片，~150 行）
+- [ ] **SHARE-02**: 提取 McpServerCard 组件（MCP 服务器卡片，~150 行）
+- [ ] **SHARE-03**: 提取 ApiKeyInput 组件（API 密钥输入，~80 行）
+- [ ] **SHARE-04**: 提取 VerifyStatusIndicator 组件（验证状态指示器，~60 行）
 
-### Authentication
+### 设置区块 (SECTION)
 
-- **AUTH-11**: 单个数字 OTP 输入框（6格），自动聚焦下一个
-- **AUTH-12**: 验证码自动提交（输入完6位即触发验证）
-- **AUTH-13**: 记住设备（免密登录）
-- **AUTH-14**: 短信配额警告（显示剩余发送次数）
-- **AUTH-15**: 语音验证码 fallback（电话呼叫）
+- [ ] **SECTION-01**: 创建 AccountSection（账户设置，~100 行）
+- [ ] **SECTION-02**: 创建 GeneralSection（通用设置，~300 行）
+- [ ] **SECTION-03**: 创建 ProvidersSection（供应商管理，~600 行）
+- [ ] **SECTION-04**: 创建 McpSection（MCP 工具管理，~800 行）
+- [ ] **SECTION-05**: 创建 AboutSection（关于页面，~200 行）
 
-### Multi-User
+### 对话框组件 (DIALOG)
 
-- **AUTH-16**: 多用户切换（同一设备多个账号）
-- **AUTH-17**: 多设备登录管理（查看/注销其他设备）
+- [ ] **DIALOG-01**: 提取 CustomProviderDialog（自定义供应商对话框，~300 行）
+- [ ] **DIALOG-02**: 提取 CustomMcpDialog（自定义 MCP 对话框，~250 行）
+- [ ] **DIALOG-03**: 提取 PlaywrightConfigPanel（Playwright 配置面板）
+- [ ] **DIALOG-04**: 提取 EdgeTtsConfigPanel（Edge TTS 配置面板）
+- [ ] **DIALOG-05**: 提取 GeminiImageConfigPanel（Gemini Image 配置面板）
+
+### 业务逻辑 Hooks (HOOK)
+
+- [ ] **HOOK-01**: 提取 useProviderVerify hook（供应商验证逻辑）
+- [ ] **HOOK-02**: 提取 useMcpServers hook（MCP 服务器管理）
+- [ ] **HOOK-03**: 提取 useSubscription hook（订阅状态管理）
+
+### 质量保证 (QA)
+
+- [ ] **QA-01**: 所有功能回归测试通过（无功能破坏）
+- [ ] **QA-02**: TypeScript 严格模式，无 any 类型
+- [ ] **QA-03**: 单文件代码量 <500 行
+- [ ] **QA-04**: ESLint react-hooks/exhaustive-deps 通过
+- [ ] **QA-05**: 所有组件有明确 Props 接口定义
+- [ ] **QA-06**: 遵循项目 React Stability Rules
+
+---
+
+## v2 需求（已延期）
+
+### 高级功能
+
+- [ ] **ADV-01**: 乐观 UI 更新（instant feedback, rollback on error）
+- [ ] **ADV-02**: 实时表单验证（debounced validation）
+- [ ] **ADV-03**: 设置搜索/筛选功能
+- [ ] **ADV-04**: 撤销/重做功能（undo/redo）
+- [ ] **ADV-05**: 性能优化（React.memo, 虚拟滚动）
+
+### 测试
+
+- [ ] **TEST-01**: 共享组件单元测试
+- [ ] **TEST-02**: Custom hooks 单元测试
+- [ ] **TEST-03**: 视觉回归测试
+- [ ] **TEST-04**: 集成测试
+
+---
 
 ## Out of Scope
 
-| Feature | Reason |
-|---------|--------|
-| 密码登录/注册 | 仅支持短信验证码 |
-| OAuth 第三方登录 | 未来 v2 考虑 |
-| 微信/支付宝账号绑定 | 未来 v2 |
-| 人脸/指纹认证 | 桌面端无意义 |
-| SMS 每次启动都验证 | 桌面端 TOKEN 机制足够 |
-
-## Traceability
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| AUTH-01 | Phase 1 | Complete |
-| AUTH-02 | Phase 1 | Complete |
-| AUTH-03 | Phase 1 | Complete |
-| AUTH-04 | Phase 2 | Complete |
-| AUTH-05 | Phase 2 | Pending |
-| AUTH-06 | Phase 1 | Complete |
-| AUTH-07 | Phase 1 | Complete |
-| AUTH-08 | Phase 2 | Complete |
-| AUTH-09 | Phase 1 | Complete |
-| AUTH-10 | Phase 2 | Pending |
-| UX-01 | Phase 2 | Complete |
-| UX-02 | Phase 2 | Complete |
-| UX-03 | Phase 2 | Pending |
-
-**Coverage:**
-- v1 requirements: 13 total
-- Mapped to phases: 13
-- Unmapped: 0
+- **功能变更** — 仅重构，不改功能
+- **样式修改** — 保持现有 UI 设计
+- **全局状态管理迁移** — 仍使用 useConfig，不引入 Redux/Zustand
+- **过早性能优化** — 组件化自然带来提升，不做针对性优化
+- **新设置区块** — 仅拆分现有 9 个区块
 
 ---
-*Requirements defined: 2026-04-08*
-*Last updated: 2026-04-08 after roadmap creation*
+
+## 需求可追溯性
+
+本节在 ROADMAP.md 创建后填充，将每个需求映射到对应阶段。
+
+| REQ-ID | 需求描述 | 阶段 |
+|--------|---------|------|
+| ARCH-01 | 创建 Settings/ 目录结构 | Phase 1 |
+| ARCH-02 | 创建 SettingsLayout 组件 | Phase 1 |
+| ARCH-03 | 创建 SettingsSidebar 组件 | Phase 1 |
+| ARCH-04 | 重构 index.tsx 为组合根组件 | Phase 1 |
+| SHARE-01 | 提取 ProviderCard 组件 | Phase 2 |
+| SHARE-02 | 提取 McpServerCard 组件 | Phase 2 |
+| SHARE-03 | 提取 ApiKeyInput 组件 | Phase 2 |
+| SHARE-04 | 提取 VerifyStatusIndicator 组件 | Phase 2 |
+| SECTION-01 | 创建 AccountSection | Phase 1 |
+| SECTION-02 | 创建 GeneralSection | Phase 5 |
+| SECTION-03 | 创建 ProvidersSection | Phase 4 |
+| SECTION-04 | 创建 McpSection | Phase 4 |
+| SECTION-05 | 创建 AboutSection | Phase 1 |
+| HOOK-01 | 提取 useProviderVerify hook | Phase 3 |
+| HOOK-02 | 提取 useMcpServers hook | Phase 3 |
+| HOOK-03 | 提取 useSubscription hook | Phase 3 |
+| DIALOG-01 | 提取 CustomProviderDialog | Phase 6 |
+| DIALOG-02 | 提取 CustomMcpDialog | Phase 6 |
+| DIALOG-03 | 提取 PlaywrightConfigPanel | Phase 6 |
+| DIALOG-04 | 提取 EdgeTtsConfigPanel | Phase 6 |
+| DIALOG-05 | 提取 GeminiImageConfigPanel | Phase 6 |
+| QA-01 | 功能回归测试 | Phase 7 |
+| QA-02 | TypeScript 无 any 类型 | Phase 7 |
+| QA-03 | 单文件 <500 行 | Phase 7 |
+| QA-04 | ESLint 通过 | Phase 7 |
+| QA-05 | Props 接口定义 | Phase 7 |
+| QA-06 | 遵循 Stability Rules | Phase 7 |
+
+---
+
+## 需求分类说明
+
+### Table Stakes（必须具备）
+- 所有 ARCH（架构）需求
+- 所有 SHARE（共享组件）需求
+- 所有 SECTION（设置区块）需求
+- 所有 HOOK（业务逻辑）需求
+- QA-01 到 QA-06（质量保证）
+
+### Differentiators（竞争优势）
+- 代码可维护性提升
+- 开发体验改善
+- 组件可复用性
+
+### Anti-Features（明确不构建）
+- 功能变更
+- 样式修改
+- 过早性能优化
+- 新设置区块
+
+---
+
+*需求文档创建于 2026-04-09*
