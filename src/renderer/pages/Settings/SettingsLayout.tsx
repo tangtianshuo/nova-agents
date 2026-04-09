@@ -1,4 +1,5 @@
 import React from 'react';
+import SettingsSidebar from './SettingsSidebar';
 import type { AppConfig } from '@/config/types';
 
 // SettingsSection type from existing Settings.tsx
@@ -29,13 +30,12 @@ export default function SettingsLayout({
 }: SettingsLayoutProps) {
   return (
     <div className="flex h-full bg-[var(--paper)]">
-      {/* Sidebar - will contain SettingsSidebar component */}
-      <div className="w-52 flex-shrink-0 border-r border-[var(--line)]">
-        {/* SettingsSidebar will be rendered here in plan 01-03 */}
-        <div className="p-4 text-[var(--ink-muted)]">
-          Sidebar (will be SettingsSidebar)
-        </div>
-      </div>
+      {/* Sidebar */}
+      <SettingsSidebar
+        activeSection={activeSection}
+        onSectionChange={onSectionChange}
+        config={config}
+      />
 
       {/* Main content area */}
       <main className="flex-1 overflow-y-auto">
