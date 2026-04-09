@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import OtpInput from '../components/OtpInput';
@@ -132,11 +132,15 @@ export default function LoginPage({ isActive, onLoginSuccess }: LoginPageProps) 
   };
 
   // ============================================================
-  // Navigation to register
+  // Navigation to register / close
   // ============================================================
 
   const handleNavigateToRegister = () => {
     window.dispatchEvent(new CustomEvent(CUSTOM_EVENTS.NAVIGATE_TO_REGISTER));
+  };
+
+  const handleClose = () => {
+    window.dispatchEvent(new CustomEvent(CUSTOM_EVENTS.NAVIGATE_TO_LAUNCHER));
   };
 
   // ============================================================
@@ -144,24 +148,37 @@ export default function LoginPage({ isActive, onLoginSuccess }: LoginPageProps) 
   // ============================================================
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[200] bg-black/30 backdrop-blur-sm">
-      <div className="bg-[var(--paper-elevated)] border border-[var(--line)] rounded-[var(--radius-xl)] shadow-lg w-full max-w-md p-8">
+    <div
+      className="fixed inset-0 flex items-center justify-center z-[200] bg-black/30 backdrop-blur-sm"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+    >
+      <div className="bg-[var(--paper-elevated)] border border-[var(--line)] rounded-[var(--radius-xl)] shadow-lg w-full max-w-md p-6">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-[var(--text-3xl)] font-semibold text-[var(--ink)]">
+        <div className="flex justify-between items-center mb-5">
+          <h1 className="text-[var(--text-xl)] font-semibold text-[var(--ink)]">
             手机号登录
           </h1>
-          <button
-            type="button"
-            onClick={handleNavigateToRegister}
-            className="text-[var(--ink-muted)] text-sm hover:text-[var(--ink)] transition-colors"
-          >
-            去注册
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleNavigateToRegister}
+              className="text-[var(--ink-muted)] text-sm hover:text-[var(--ink)] transition-colors"
+            >
+              去注册
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="p-1.5 rounded-lg text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-[var(--paper-inset)] transition-colors"
+              title="关闭"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* Phone input */}
           <div>
             <label className="text-[var(--text-sm)] font-medium text-[var(--ink)] mb-2 block">
@@ -182,7 +199,7 @@ export default function LoginPage({ isActive, onLoginSuccess }: LoginPageProps) 
             />
             {phoneError && (
               <div className="text-[var(--text-sm)] text-[var(--error)] mt-1 flex items-center gap-1">
-                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                <AlertCircle className="h-3 w-3 flex-shrink-0" />
                 <span>{phoneError}</span>
               </div>
             )}
@@ -198,7 +215,7 @@ export default function LoginPage({ isActive, onLoginSuccess }: LoginPageProps) 
                 type="button"
                 onClick={handleSendSms}
                 disabled={countdown > 0 || isSendingSms || !phone || isSubmitting}
-                className="bg-[var(--button-secondary-bg)] text-[var(--button-secondary-text)] rounded-full px-4 py-2.5 text-[13px] font-medium hover:bg-[var(--button-secondary-bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 transition-colors"
+                className="bg-[var(--button-secondary-bg)] text-[var(--button-secondary-text)] rounded-full px-4 py-2 text-[13px] font-medium hover:bg-[var(--button-secondary-bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 transition-colors"
               >
                 {isSendingSms ? (
                   <>
@@ -226,7 +243,7 @@ export default function LoginPage({ isActive, onLoginSuccess }: LoginPageProps) 
             </div>
             {codeError && (
               <div className="text-[var(--text-sm)] text-[var(--error)] mt-1 flex items-center gap-1">
-                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                <AlertCircle className="h-3 w-3 flex-shrink-0" />
                 <span>{codeError}</span>
               </div>
             )}
@@ -250,7 +267,7 @@ export default function LoginPage({ isActive, onLoginSuccess }: LoginPageProps) 
         </form>
 
         {/* Footer */}
-        <div className="mt-6 text-center text-sm text-[var(--ink-muted)]">
+        <div className="mt-5 text-center text-sm text-[var(--ink-muted)]">
           还没有账号？{' '}
           <button
             type="button"

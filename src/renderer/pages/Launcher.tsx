@@ -4,13 +4,14 @@
  * Responsive: stacks vertically below 768px
  */
 
-import { FolderPlus, LayoutTemplate, Loader2 } from 'lucide-react';
+import { FolderPlus, LayoutTemplate, Loader2, User, LogOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 
 import { track } from '@/analytics';
 import { type ImageAttachment } from '@/components/SimpleChatInput';
 import { useToast } from '@/components/Toast';
+import { useAuth } from '@/context/AuthContext';
 import { UnifiedLogsPanel } from '@/components/UnifiedLogsPanel';
 import PathInputDialog from '@/components/PathInputDialog';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -45,6 +46,7 @@ export default function Launcher({ onLaunchProject, isStarting, startError: _sta
     const toast = useToast();
     const toastRef = useRef(toast);
     toastRef.current = toast;
+    const { isAuthenticated, user } = useAuth();
     const {
         config,
         projects,
@@ -270,6 +272,15 @@ export default function Launcher({ onLaunchProject, isStarting, startError: _sta
         window.dispatchEvent(new CustomEvent(CUSTOM_EVENTS.OPEN_SETTINGS, {
             detail: { section: 'providers' },
         }));
+    }, []);
+
+    // Navigate to login/register page
+    const handleNavigateToLogin = useCallback(() => {
+        window.dispatchEvent(new CustomEvent(CUSTOM_EVENTS.NAVIGATE_TO_LOGIN));
+    }, []);
+
+    const handleNavigateToRegister = useCallback(() => {
+        window.dispatchEvent(new CustomEvent(CUSTOM_EVENTS.NAVIGATE_TO_REGISTER));
     }, []);
 
     // Handle send from BrandSection
@@ -584,6 +595,41 @@ export default function Launcher({ onLaunchProject, isStarting, startError: _sta
                             onOpenCronDetail={handleOpenCronDetail}
                             isActive={isActive}
                         />
+                    </div>
+
+                    {/* User Auth Section */}
+                    <div className="mx-6 border-t border-[var(--line)]" />
+                    <div className="flex flex-shrink-0 items-center justify-between px-6 py-3">
+                        {isAuthenticated && user ? (
+                            <>
+                                {/* Logged in: show user info */}
+                                <div className="flex items-center gap-2">
+                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent-warm-muted)]">
+                                        <User className="h-3.5 w-3.5 text-[var(--accent-warm)]" />
+                                    </div>
+                                    <span className="text-[13px] font-medium text-[var(--ink)]">{user.username}</span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {/* Not logged in: show login/register buttons */}
+                                <span className="text-[13px] text-[var(--ink-muted)]">登录后享受更多个人化服务</span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handleNavigateToLogin}
+                                        className="rounded-full bg-[var(--button-secondary-bg)] px-4 py-1.5 text-[13px] font-medium text-[var(--button-secondary-text)] transition-colors hover:bg-[var(--button-secondary-bg-hover)]"
+                                    >
+                                        登录
+                                    </button>
+                                    <button
+                                        onClick={handleNavigateToRegister}
+                                        className="rounded-full bg-[var(--button-primary-bg)] px-4 py-1.5 text-[13px] font-medium text-[var(--button-primary-text)] transition-colors hover:bg-[var(--button-primary-bg-hover)]"
+                                    >
+                                        注册
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Workspaces Header */}

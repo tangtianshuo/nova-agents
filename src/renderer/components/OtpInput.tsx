@@ -117,8 +117,8 @@ export default function OtpInput({
   // ============================================================
 
   const baseInputClasses = `
-    w-12 h-14
-    text-center text-2xl font-semibold
+    w-9 h-11
+    text-center text-lg font-semibold
     border border-[var(--line)]
     rounded-[var(--radius-sm)]
     bg-[var(--paper)]

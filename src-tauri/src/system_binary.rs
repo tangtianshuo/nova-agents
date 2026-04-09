@@ -52,7 +52,7 @@ pub fn find(binary_name: &str) -> Option<PathBuf> {
 pub fn augmented_path() -> std::ffi::OsString {
     let system_path = std::env::var("PATH").unwrap_or_default();
     let sep = if cfg!(windows) { ";" } else { ":" };
-    let mut parts: Vec<&str> = system_path.split(sep).collect();
+    let parts: Vec<&str> = system_path.split(sep).collect();
 
     #[cfg(not(target_os = "windows"))]
     for dir in EXTRA_SEARCH_DIRS {

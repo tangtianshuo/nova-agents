@@ -63,6 +63,8 @@ import { getPlatform } from '@/analytics/device';
 import { shortenPathForDisplay } from '@/utils/pathDetection';
 import type { LogEntry } from '@/types/log';
 import BugReportOverlay from '@/components/BugReportOverlay';
+import { useAuth } from '@/context/AuthContext';
+import { LogOut, User } from 'lucide-react';
 
 /** Parse a string as a positive integer, returning undefined for invalid/non-positive values */
 function parsePositiveInt(value: string): number | undefined {
@@ -71,7 +73,7 @@ function parsePositiveInt(value: string): number | undefined {
 }
 
 // Settings sub-sections
-type SettingsSection = 'general' | 'providers' | 'mcp' | 'skills' | 'sub-agents' | 'agent' | 'usage-stats' | 'about';
+type SettingsSection = 'general' | 'providers' | 'mcp' | 'skills' | 'sub-agents' | 'agent' | 'usage-stats' | 'about' | 'account';
 
 import type { SubscriptionStatusWithVerify } from '@/types/subscription';
 
@@ -155,7 +157,7 @@ interface SettingsProps {
     onRestartAndUpdate?: () => void;
 }
 
-const VALID_SECTIONS: SettingsSection[] = ['general', 'providers', 'mcp', 'skills', 'sub-agents', 'agent', 'usage-stats', 'about'];
+const VALID_SECTIONS: SettingsSection[] = ['general', 'providers', 'mcp', 'skills', 'sub-agents', 'agent', 'usage-stats', 'about', 'account'];
 
 // Memoized component for model tag list to avoid recreating presetModelIds on every render
 const ModelTagList = React.memo(function ModelTagList({
@@ -2221,6 +2223,85 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
         );
     };
 
+    // ============================================================
+    // Account Settings Component
+    // ============================================================
+    function AccountSettings() {
+        const { user, logout } = useAuth();
+        const toast = useToast();
+        const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+        const handleLogout = async () => {
+            setIsLoggingOut(true);
+            try {
+                await logout();
+                toast.success('已退出登录');
+            } catch (error) {
+                console.error('[AccountSettings] Logout failed:', error);
+                toast.error('退出登录失败');
+            } finally {
+                setIsLoggingOut(false);
+            }
+        };
+
+        const handleLogin = () => {
+            window.dispatchEvent(new CustomEvent(CUSTOM_EVENTS.NAVIGATE_TO_LOGIN));
+        };
+
+        return (
+            <div className="mx-auto max-w-4xl px-8 py-8">
+                <h2 className="mb-8 text-lg font-semibold text-[var(--ink)]">账户</h2>
+
+                {user ? (
+                    // Logged in state
+                    <div className="space-y-6">
+                        {/* User info card */}
+                        <div className="rounded-xl border border-[var(--line)] bg-[var(--paper-elevated)] p-6">
+                            <div className="flex items-center gap-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent-warm-subtle)]">
+                                    <User className="h-6 w-6 text-[var(--accent-warm)]" />
+                                </div>
+                                <div>
+                                    <p className="font-medium text-[var(--ink)]">{user.username || `用户 ${user.userId.slice(0, 8)}`}</p>
+                                    <p className="text-sm text-[var(--ink-muted)]">ID: {user.userId}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Logout button */}
+                        <button
+                            onClick={handleLogout}
+                            disabled={isLoggingOut}
+                            className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-[var(--error)] hover:bg-[var(--error-bg)] disabled:opacity-50 transition-colors"
+                        >
+                            {isLoggingOut ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <LogOut className="h-4 w-4" />
+                            )}
+                            退出登录
+                        </button>
+                    </div>
+                ) : (
+                    // Not logged in state
+                    <div className="space-y-6">
+                        <div className="rounded-xl border border-[var(--line)] bg-[var(--paper-elevated)] p-6">
+                            <p className="mb-4 text-sm text-[var(--ink-muted)]">
+                                登录后可同步您的个人设置和订阅信息
+                            </p>
+                            <button
+                                onClick={handleLogin}
+                                className="flex items-center gap-2 rounded-full bg-[var(--button-primary-bg)] px-5 py-2.5 text-sm font-medium text-[var(--button-primary-text)] hover:bg-[var(--button-primary-bg-hover)] transition-colors"
+                            >
+                                登录 / 注册
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     return (
         <div className="flex h-full bg-[var(--paper)]">
             {/* Logs Panel */}
@@ -2310,6 +2391,15 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                     >
                         关于&反馈
                     </button>
+                    <button
+                        onClick={() => setActiveSection('account')}
+                        className={`w-full rounded-lg px-3 py-2.5 text-left text-base font-medium transition-colors ${activeSection === 'account'
+                            ? 'settings-nav-active bg-[var(--hover-bg)] text-[var(--ink)]'
+                            : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
+                            }`}
+                    >
+                        账户
+                    </button>
                 </nav>
             </div>
 
@@ -2335,6 +2425,11 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                     <div className="mx-auto max-w-4xl px-8 py-8">
                         <UsageStatsPanel />
                     </div>
+                )}
+
+                {/* Account section */}
+                {activeSection === 'account' && (
+                    <AccountSettings />
                 )}
 
                 {/* Providers section uses wider layout */}
@@ -3065,16 +3160,19 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                 <p className="text-xs font-medium uppercase tracking-widest text-[var(--ink-muted)]/50">From the Developer</p>
                                 <div className="mt-4 space-y-5 text-[13px] leading-[1.9] text-[var(--ink-secondary)]">
                                     <p>
-                                        <span className="font-semibold text-[var(--ink)]">NovaAgents</span> 是一款住在你电脑里的 AI Agent 桌面客户端，你的个人 AI 中心。基于 Claude Agent SDK 运行，同时支持接入各家大模型与快速切换。所有操作都在本地完成，数据始终留在你的电脑里。
+                                        <span className="font-semibold text-[var(--ink)]">NovaAgents</span> 你的本地 Agent 枢纽，电脑里的个人 AI 中心。
                                     </p>
                                     <p>
-                                        Claude Code 让开发者率先体会到了 AI 加持下的无限生产力，OpenClaw 又让普通人看到了像伙伴一样的主动型 Agent 助手的雏形。而 NovaAgents 要做的，是让本地 Agent 成为完全体——当你在电脑前，它能触达你的文件、项目与一切工具，与你精细化地协同工作，完成高质量的产出；当你不在电脑前，它也能像你的分身，7×24 小时感知世界，按照你的意图持续行动。
+                                        兼容并蓄，且坚守本地。我们不仅继承了 Claude Code 的极致效率与 OpenClaw 的主动交互，更致力于打造一种全时空的 Agent 体验：
                                     </p>
                                     <p>
-                                        不同于每次对话都要重新自我介绍的 AI 工具，NovaAgents 里的 Agent 与你的生活、工作深度同步，是一个越来越懂你的搭档。我们希望它成为每个人意图的超级放大器——
+                                        它是协同者，触达你的所有工具与项目，完成从指令到产出的精细跨越；它是守望者，在你离开后依然代你感知、思考与行动。NovaAgents 不再是一个陌生的窗口，而是随你共同成长的数字镜像。
+                                    </p>
+                                     <p>
+                                        它是你意图的扩音器，让一切复杂终结于此
                                     </p>
                                     <p className="text-center text-[14px] font-medium italic tracking-wide text-[var(--ink)]">
-                                        你有一个想法，And it&apos;s done.
+                                        一念既起，万事皆成。
                                     </p>
                                 </div>
                             </div>
@@ -3123,24 +3221,24 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
                                         <p className="text-xs font-medium uppercase tracking-wider text-[var(--ink-muted)]">Developer</p>
-                                        <p className="mt-1 text-[var(--ink)]">Ethan L</p>
+                                        <p className="mt-1 text-[var(--ink)]">Nova</p>
                                     </div>
                                     <div>
                                         <p className="text-xs font-medium uppercase tracking-wider text-[var(--ink-muted)]">Website</p>
                                         <ExternalLink
-                                            href="https://novaagents.io"
+                                            href="https://novai.net.cn"
                                             className="mt-1 block text-[var(--accent)] hover:underline"
                                         >
-                                            novaagents.io
+                                            novai.net.cn
                                         </ExternalLink>
                                     </div>
                                     <div>
                                         <p className="text-xs font-medium uppercase tracking-wider text-[var(--ink-muted)]">Contact</p>
                                         <ExternalLink
-                                            href="mailto:novaagents.io@gmail.com"
+                                            href="novaintelligent@gmail.com"
                                             className="mt-1 block text-[var(--accent)] hover:underline"
                                         >
-                                            novaagents.io@gmail.com
+                                            novaintelligent@gmail.com
                                         </ExternalLink>
                                     </div>
                                 </div>
@@ -3148,7 +3246,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
 
                             {/* Copyright */}
                             <p className="text-center text-xs text-[var(--ink-muted)]">
-                                © 2026 Ethan L. All rights reserved.
+                                © 2026 Nova Intelligent. All rights reserved.
                             </p>
 
                             {/* Developer Section - Hidden by default, unlocked by tapping logo 5 times */}
@@ -3159,7 +3257,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                         {/* Developer Mode Toggle */}
                                         <div className="rounded-xl border border-[var(--line)] bg-[var(--paper-elevated)] p-5">
                                             <div className="flex items-center justify-between">
-                                                <div>
+                                                <div>../
                                                     <h3 className="text-sm font-medium text-[var(--ink)]">开发者模式</h3>
                                                     <p className="mt-1 text-xs text-[var(--ink-muted)]">
                                                         显示页面上的日志入口按钮（如 Logs、System Info 等）。

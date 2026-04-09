@@ -5,7 +5,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$PROJECT_DIR = $PSScriptRoot
+$PROJECT_DIR = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 
 # 加载 .env 文件（如果存在）
 $envFile = Join-Path $PROJECT_DIR ".env"
@@ -173,10 +173,11 @@ Write-ColorOutput "✓ 前端构建完成" "Green"
 Write-Host ""
 
 # 强制触发 Rust 重新编译 (确保 sidecar.rs 的逻辑修改生效)
+# 使用覆盖模式，避免时间戳累积污染源文件
 $sidecarFile = Join-Path $PROJECT_DIR "src-tauri/src/sidecar.rs"
 $mainFile = Join-Path $PROJECT_DIR "src-tauri/src/main.rs"
-(Get-Date).ToString() | Out-File -FilePath $sidecarFile -Append -Encoding UTF8
-(Get-Date).ToString() | Out-File -FilePath $mainFile -Append -Encoding UTF8
+"# trigger rebuild: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $sidecarFile -Encoding UTF8
+"# trigger rebuild: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $mainFile -Encoding UTF8
 
 # 构建 Tauri 应用
 Write-ColorOutput "[3/3] 构建 Tauri 应用 (Debug 模式, NSIS)..." "Blue"
@@ -196,14 +197,18 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
 Write-ColorOutput "这可能需要几分钟..." "Yellow"
 
 # 使用 --target 指定架构，确保构建正确的版本
+$buildSucceeded = $false
 try {
     & bun run tauri:build -- --debug --bundles nsis --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
-    if ($LASTEXITCODE -ne 0 -and $env:TAURI_SIGNING_PRIVATE_KEY) {
-        throw "Tauri build failed"
+    if ($LASTEXITCODE -eq 0) {
+        $buildSucceeded = $true
+    } else {
+        throw "Tauri build failed with exit code $LASTEXITCODE"
     }
 } catch {
     if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
         Write-ColorOutput "⚠ 构建完成（签名跳过）" "Yellow"
+        $buildSucceeded = $true
     } else {
         throw
     }

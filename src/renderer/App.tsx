@@ -1479,12 +1479,19 @@ export default function App() {
       setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, view: 'login' } : t));
     };
 
+    const handleNavigateToLauncher = () => {
+      console.log('[App] Navigate to launcher');
+      setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, view: 'launcher' } : t));
+    };
+
     window.addEventListener(CUSTOM_EVENTS.NAVIGATE_TO_REGISTER, handleNavigateToRegister);
     window.addEventListener(CUSTOM_EVENTS.NAVIGATE_TO_LOGIN, handleNavigateToLogin);
+    window.addEventListener(CUSTOM_EVENTS.NAVIGATE_TO_LAUNCHER, handleNavigateToLauncher);
 
     return () => {
       window.removeEventListener(CUSTOM_EVENTS.NAVIGATE_TO_REGISTER, handleNavigateToRegister);
       window.removeEventListener(CUSTOM_EVENTS.NAVIGATE_TO_LOGIN, handleNavigateToLogin);
+      window.removeEventListener(CUSTOM_EVENTS.NAVIGATE_TO_LAUNCHER, handleNavigateToLauncher);
     };
   }, [setTabs]);
 
