@@ -1,82 +1,131 @@
-# nova-agents 用户登录注册
+# Settings 页面组件化拆分
 
 ## What This Is
 
-nova-agents 桌面应用的**用户身份认证模块**。基于短信验证码实现用户的登录和注册功能，接入已有的 `@nova-intelligent/auth-sdk`，为桌面客户端提供用户身份体系。
+nova-agents 设置页面的**组件化重构项目**。将当前 5707 行的 Settings.tsx 单文件组件拆分为模块化、可维护的组件架构。
 
-**现状：** nova-agents 是多会话 AI Agent 桌面客户端，无用户身份系统。所有会话共享同一配置，无个人化设置、多用户隔离、订阅管理。
+**现状：** Settings.tsx 是一个巨大的单文件组件（5707 行），包含 9 个设置区块、30+ useState、复杂的状态管理和交互逻辑，可维护性低，修改风险高。
 
 ## Core Value
 
-**用户能够通过手机号 + 短信验证码安全地登录或注册 nova-agents，实现个人身份与工作区的绑定。**
+**开发者能够高效维护 Settings 页面，单文件代码量 <500 行，组件职责清晰，状态局部化。**
 
 ## Requirements
 
 ### Validated
 
-- [x] SDK HTTP 请求通过 Rust 代理层（TauriAuthClient + invoke proxy_http_request）— Phase 1
-- [x] 登录态持久化（DiskTokenStorage + AppConfig.auth）— Phase 1
-- [x] AuthData schema 和 configurable baseURL — Phase 1
+（None yet — ship to validate）
 
 ### Active
 
-- [ ] 用户可使用手机号 + 短信验证码注册新账号 — Phase 2
-- [ ] 用户可使用手机号 + 短信验证码登录已有账号 — Phase 2
-- [ ] 用户可登出账号 — Phase 2
-- [ ] 短信发送频率限制（防刷）— Phase 2
+### 布局与架构
+- [ ] **ARCH-01**: 创建 Settings 布局结构（SettingsLayout + SettingsSidebar）
+- [ ] **ARCH-02**: 创建 Settings/ 目录结构（sections/、components/、hooks/）
+- [ ] **ARCH-03**: 重构主入口为组合组件（index.tsx ~200 行）
+
+### 共享组件
+- [ ] **SHARE-01**: 提取 ProviderCard 组件（供应商卡片）
+- [ ] **SHARE-02**: 提取 McpServerCard 组件（MCP 服务器卡片）
+- [ ] **SHARE-03**: 提取 ApiKeyInput 组件（API 密钥输入）
+- [ ] **SHARE-04**: 提取 VerifyStatusIndicator 组件（验证状态指示器）
+
+### 设置区块
+- [ ] **SECTION-01**: 创建 AccountSection（账户设置）
+- [ ] **SECTION-02**: 创建 GeneralSection（通用设置）
+- [ ] **SECTION-03**: 创建 ProvidersSection（供应商管理）
+- [ ] **SECTION-04**: 创建 McpSection（MCP 工具管理）
+- [ ] **SECTION-05**: 创建 AboutSection（关于页面）
+
+### 对话框与配置面板
+- [ ] **DIALOG-01**: 提取 CustomProviderDialog（自定义供应商对话框）
+- [ ] **DIALOG-02**: 提取 CustomMcpDialog（自定义 MCP 对话框）
+- [ ] **DIALOG-03**: 提取 PlaywrightConfigPanel（Playwright 配置面板）
+- [ ] **DIALOG-04**: 提取 EdgeTtsConfigPanel（Edge TTS 配置面板）
+- [ ] **DIALOG-05**: 提取 GeminiImageConfigPanel（Gemini Image 配置面板）
+
+### Hooks
+- [ ] **HOOK-01**: 提取 useProviderVerify hook（供应商验证逻辑）
+- [ ] **HOOK-02**: 提取 useMcpServers hook（MCP 服务器管理）
+- [ ] **HOOK-03**: 提取 useSubscription hook（订阅状态管理）
+
+### 质量保证
+- [ ] **QA-01**: 所有功能回归测试通过
+- [ ] **QA-02**: TypeScript 无 any 类型
+- [ ] **QA-03**: 单文件代码量 <500 行
+- [ ] **QA-04**: ESLint 无警告
 
 ## Current State
 
-**Phase 1 complete** — Auth transport layer delivered:
-- TauriAuthClient routes all SMS API calls through Rust `invoke('proxy_http_request')`
-- DiskTokenStorage persists tokens to `AppConfig.auth` via `atomicModifyConfig`
-- AppConfig schema extended with `authServerUrl` + `AuthData` fields
-- 28 unit tests passing, TypeScript clean
+**Design complete** — 详细设计文档已创建在 `docs/settings-componentization.md`，包含：
+- 现状分析（5707 行，30+ useState）
+- 架构设计（目录结构、依赖关系图）
+- 组件设计（Props 接口、状态管理）
+- 迁移计划（6 个阶段）
+- 风险与对策
 
-### Out of Scope
+## Out of Scope
 
-- 密码登录/注册 — 仅短信验证码
-- OAuth 第三方登录 — 仅手机号
-- 账号绑定（微信/支付宝）— 未来 v2
-- 多设备登录管理 — 未来 v2
-- 人脸/指纹认证 — 桌面端无意义
+- **功能变更** — 仅重构，不改功能
+- **样式修改** — 保持现有 UI 设计
+- **性能优化** — 不做针对性优化，组件化自然带来提升
+- **全局状态管理迁移** — 仍使用 useConfig，不引入 Redux/Zustand
 
 ## Context
 
 ### 已有资产
 
-- **nova-auth-sdk** (`src/SDK/nova-auth-sdk/`) — TypeScript SDK，已实现：
-  - `sendSmsCode(phone, type)` → POST `/auth/sms/send`
-  - `smsLogin(phone, code)` → POST `/auth/sms/login`
-  - `smsRegister(phone, code, username)` → POST `/auth/sms/register`
-  - `getSmsStats(phone)` → GET `/auth/sms/stats`
-  - Token 自动 refresh + localStorage 持久化
-  - Tauri deep link 工具函数
-- **现有架构**：Tauri v2 + React 19，前端所有 HTTP 须经 Rust 代理层
-- **现有设计系统**：Paper/Ink 色系，14px 主按钮，规范在 `specs/guides/design_guide.md`
+- **Settings.tsx**（5707 行）— 包含 9 个设置区块的完整实现
+- **已提取组件**（5 个）— GlobalSkillsPanel、GlobalAgentsPanel、UsageStatsPanel、BotPlatformRegistry、WorkspaceConfigPanel
+- **设计系统** — Paper/Ink 色系，规范在 `specs/guides/design_guide.md`
+- **配置系统** — useConfig hook，disk-first 持久化
 
 ### 技术约束
 
-- **Rust 代理层强制**：所有前端 HTTP 必须走 `invoke('cmd_proxy_http')` → Rust → reqwest → Bun Sidecar/后端。SDK 原生 `fetch()` 需封装
-- **Token 持久化**：SDK 默认 localStorage，但 config 系统是 disk-first（`~/.nova-agents/config.json`）。需确保 token 存储路径一致
-- **Auth API 地址**：需确认 auth-server 部署地址（开发环境 vs 生产环境）
-- **多 Tab 登录态**：所有 Tab 共享同一登录态，需考虑 Session 隔离
+- **架构合规** — 遵循项目架构规范（`specs/tech_docs/architecture.md`）
+- **设计规范** — 遵循设计指南（`specs/guides/design_guide.md`）
+- **类型安全** — TypeScript 严格模式，无 any 类型
+- **功能不变** — 所有现有功能必须保持正常工作
+
+### 技术栈
+
+- React 19 + TypeScript 5.9
+- Tauri v2
+- TailwindCSS v4
+- Lucide React Icons
 
 ## Constraints
 
-- **架构合规**: HTTP 流量必须经 Rust 代理层 — SDK fetch 需重新封装
-- **无后端自建**: auth-server 是外部服务，只做前端接入
-- **桌面端首次**: 短信验证码交互需适配桌面端 UX（输入框 + 倒计时 + 错误提示）
+- **功能完整性** — 所有功能必须保持，不能有任何回归
+- **渐进迁移** — 分阶段迁移，每阶段可独立验收
+- **UI 一致性** — 拆分后 UI 与原设计完全一致
+- **类型安全** — 所有 Props 接口必须有明确类型定义
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 使用 nova-auth-sdk | 已有完整 SMS auth 实现，减少自研 | ✓ 采用 |
-| SDK HTTP 封装 via Tauri invoke | 架构要求所有 HTTP 经 Rust 代理层 | — Pending |
-| Token 存 localStorage | SDK 默认行为，够用（桌面端无跨域风险） | ✓ 采用 |
-| Auth API baseURL 可配置 | 开发/生产环境不同地址 | — Pending |
-| 登录页为独立路由 | 非 Tab 页面，独立 session 生命周期 | — Pending |
+| 组件化拆分 | 单文件过大，维护困难 | ✓ 采用 |
+| 状态局部化 | 减少 Props 传递，提高可维护性 | ✓ 采用 |
+| 共享组件 | ProviderCard、McpServerCard 等 | ✓ 采用 |
+| Hook 封装 | useProviderVerify、useMcpServers 等 | ✓ 采用 |
+| 渐进迁移 | 6 个阶段，每阶段可独立验收 | ✓ 采用 |
+
+## Evolution
+
+此文档在阶段转换和里程碑边界时演进。
+
+**每次阶段转换后**（通过 `/gsd:transition`）：
+1. 失效的需求？→ 移至 Out of Scope 并注明原因
+2. 验证的需求？→ 移至 Validated 并注明阶段
+3. 新需求出现？→ 添加到 Active
+4. 要记录的决策？→ 添加到 Key Decisions
+5. "What This Is" 仍然准确？→ 如有偏移则更新
+
+**每次里程碑后**（通过 `/gsd:complete-milestone`）：
+1. 全部章节的完整审查
+2. Core Value 检查 — 仍是最合适的优先级？
+3. 审计 Out of Scope — 原因仍然有效？
+4. 用当前状态更新 Context
 
 ---
-*Last updated: 2026-04-08 after initialization*
+*Last updated: 2026-04-09 after initialization*
