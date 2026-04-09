@@ -41,7 +41,14 @@
 4. index.tsx 重构为组合根组件，代码量 <200 行
 5. 布局响应式设计正常（移动端侧边栏可折叠）
 
-**Plans:** TBD
+**Plans:** 5 plans
+
+Plans:
+- [ ] 01-foundation-01-PLAN.md — Create Settings/ directory structure
+- [ ] 01-foundation-02-PLAN.md — Create SettingsLayout component
+- [ ] 01-foundation-03-PLAN.md — Create SettingsSidebar component
+- [ ] 01-foundation-04-PLAN.md — Migrate AccountSection
+- [ ] 01-foundation-05-PLAN.md — Refactor index.tsx as composition root + Migrate AboutSection
 
 ---
 
@@ -111,7 +118,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Static Sections | 0/5 | Not started | - |
+| 1. Foundation & Static Sections | 0/5 | Planned | - |
 | 2. Shared Components & Business Logic | 0/5 | Not started | - |
 | 3. Complex Sections Migration | 0/5 | Not started | - |
 | 4. Dialogs & Quality Assurance | 0/6 | Not started | - |
@@ -203,3 +210,4 @@ Phase 4 (Dialogs + QA)
 ---
 
 *Roadmap created: 2026-04-09*
+*Last updated: 2026-04-09 (Phase 1 plans completed)*
