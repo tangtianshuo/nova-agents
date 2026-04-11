@@ -62,15 +62,15 @@ Plan: 6 of 6 - COMPLETE
 
 ### Last Action
 
-Completed Phase 04-04 execution. Builtin MCP config panels (Playwright, EdgeTTS, GeminiImage) integrated into Settings with proper routing and state management.
+Completed Phase 04-03 execution. CustomMcpDialog verified complete, removed unused toast variable bug in McpSection (db10cf7).
 
 ### Next Step
 
-Execute Phase 04 remaining plans (04-05, 04-06) to complete Phase 04.
+All Phase 04 plans complete. Phase 04 complete.
 
 ### Active Work
 
-Phase 04-04 plan complete. All three builtin MCP config panels now exported and wired into Settings/index.tsx.
+Phase 04-03 plan complete. CustomMcpDialog with dual-mode input, transport selector, validation verified working.
 
 ### Blockers
 
@@ -106,6 +106,8 @@ None
 | DeleteConfirmDialog | warning-bg token for icon container per design_guide.md | ✓ Implemented |
 | CustomProviderDialog | Provider.baseUrl nested under config per actual interface | ✓ Implemented |
 | CustomProviderDialog | maxTokens maps to provider.maxOutputTokens | ✓ Implemented |
+| CustomMcpDialog | Phase 04-03 | Dual-mode (form/JSON), transport selector, validation | ✓ Implemented |
+| CustomMcpDialog | Phase 04-03 | Bug fix: removed unused toast variable in McpSection | ✓ Fixed (db10cf7) |
 | Phase 04 P04 | 5 | 1 tasks | 5 files |
 
 ### Architecture Decisions
