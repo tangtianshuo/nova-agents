@@ -16,6 +16,7 @@ import {
   type Provider,
   type ProviderVerifyStatus,
 } from '@/config/types';
+import { DeleteConfirmDialog } from './dialogs';
 
 /**
  * ProviderCard Props - matches UI-SPEC exactly
@@ -78,7 +79,7 @@ export default function ProviderCard({
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [localVerifyError, setLocalVerifyError] = useState<VerifyError | null>(null);
   const [errorDetailOpen, setErrorDetailOpen] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const errorDetailPopoverRef = useRef<HTMLDivElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -119,16 +120,16 @@ export default function ProviderCard({
 
   // Handle delete confirmation
   const handleDeleteClick = useCallback(() => {
-    setShowDeleteConfirm(true);
+    setShowDeleteDialog(true);
   }, []);
 
   const handleCancelDelete = useCallback(() => {
-    setShowDeleteConfirm(false);
+    setShowDeleteDialog(false);
   }, []);
 
-  const handleConfirmDelete = useCallback(() => {
-    onDelete(provider);
-    setShowDeleteConfirm(false);
+  const handleConfirmDelete = useCallback(async () => {
+    await onDelete(provider);
+    setShowDeleteDialog(false);
   }, [provider, onDelete]);
 
   // Cleanup on unmount
@@ -298,24 +299,16 @@ export default function ProviderCard({
         </div>
       )}
 
-      {/* Inline delete confirmation */}
-      {showDeleteConfirm && (
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-[var(--error)]/30 bg-[var(--error-bg)] p-3">
-          <span className="text-sm text-[var(--error)]">确认删除?</span>
-          <button
-            onClick={handleCancelDelete}
-            className="rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--paper-inset)]"
-          >
-            取消
-          </button>
-          <button
-            onClick={handleConfirmDelete}
-            className="rounded-lg bg-[var(--error)] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--error-hover)]"
-          >
-            删除
-          </button>
-        </div>
-      )}
+      {/* Delete confirmation dialog */}
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        title="删除供应商"
+        message="此操作无法撤销。"
+        itemType="provider"
+        itemName={provider.name}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
     </div>
   );
 }
