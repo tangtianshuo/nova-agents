@@ -38,8 +38,6 @@ export default function McpSection({
   onServersChange,
   onDeleteServer,
 }: McpSectionProps) {
-  const toast = useToast();
-
   // Handle settings button click - routes to appropriate edit handler
   const handleSettingsClick = (server: McpServerDefinition) => {
     if (server.isBuiltin) {
