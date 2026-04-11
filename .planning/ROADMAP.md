@@ -89,7 +89,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Extract ProviderSection container
+- [x] 03-01-PLAN.md — Extract ProviderSection container
 - [ ] 03-02-PLAN.md — Extract McpSection container
 - [ ] 03-03-PLAN.md — Extract ProviderCard and McpServerCard components
 
@@ -125,7 +125,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Foundation & Static Sections | 5/5 | Done | 2026-04-10 |
 | 2. Shared Components & Business Logic | 0/5 | Not started | - |
-| 3. Complex Sections Migration | 0/3 | Planned | - |
+| 3. Complex Sections Migration | 1/3 | In progress | - |
 | 4. Dialogs & Quality Assurance | 0/6 | Not started | - |
 
 ---
