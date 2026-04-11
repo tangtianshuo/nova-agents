@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -9,6 +9,10 @@ import SettingsSidebar from './SettingsSidebar';
 
 // Import section components
 import { AccountSection, AboutSection, ProviderSection, McpSection } from './sections';
+
+// Import dialog components
+import { CustomProviderDialog } from './components/dialogs';
+import type { CustomProviderFormData } from './components/dialogs';
 
 // Import types and hooks
 import type { SettingsSection } from './SettingsLayout';
@@ -61,6 +65,11 @@ export default function Settings() {
   const [mcpEnabledIds, setMcpEnabledIds] = useState<string[]>([]);
   const [mcpEnabling, setMcpEnabling] = useState<Record<string, boolean>>({});
   const [mcpNeedsConfig, setMcpNeedsConfig] = useState<Record<string, boolean>>({});
+
+  // Custom provider dialog state
+  const [customProviderOpen, setCustomProviderOpen] = useState(false);
+  const [customProviderMode, setCustomProviderMode] = useState<'add' | 'edit'>('add');
+  const [customProviderData, setCustomProviderData] = useState<CustomProviderFormData | undefined>();
 
   // Load MCP servers on mount
   useEffect(() => {
@@ -140,14 +149,31 @@ export default function Settings() {
   };
 
   const handleManageProvider = (provider: Provider) => {
-    // TODO: Open provider management dialog
-    toast.info(`管理 ${provider.name} 功能开发中`);
+    setCustomProviderMode('edit');
+    setCustomProviderData({
+      name: provider.name,
+      cloudProvider: provider.cloudProvider,
+      apiProtocol: provider.apiProtocol || 'anthropic',
+      baseUrl: provider.config.baseUrl || '',
+      primaryModel: provider.primaryModel,
+      maxTokens: provider.maxOutputTokens,
+      authType: 'apiKey',
+    });
+    setCustomProviderOpen(true);
   };
 
   const handleAddProvider = () => {
-    // TODO: Open add provider dialog
-    toast.info('添加供应商功能开发中');
+    setCustomProviderMode('add');
+    setCustomProviderData(undefined);
+    setCustomProviderOpen(true);
   };
+
+  const handleSaveProvider = useCallback(async (data: CustomProviderFormData) => {
+    // TODO: Implement provider save logic (call config service)
+    console.log('[Settings] Saving provider:', data);
+    toast.info('供应商保存功能开发中');
+    // Refresh provider list after save
+  }, [toast]);
 
   const handleDeleteProvider = (provider: Provider) => {
     // TODO: Delete provider functionality
@@ -261,6 +287,15 @@ export default function Settings() {
           </div>
         )}
       </SettingsLayout>
+
+      {/* Custom Provider Dialog */}
+      <CustomProviderDialog
+        open={customProviderOpen}
+        mode={customProviderMode}
+        initialData={customProviderData}
+        onSave={handleSaveProvider}
+        onCancel={() => setCustomProviderOpen(false)}
+      />
     </div>
   );
 }
