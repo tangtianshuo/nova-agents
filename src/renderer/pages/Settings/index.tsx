@@ -8,11 +8,11 @@ import SettingsLayout from './SettingsLayout';
 import SettingsSidebar from './SettingsSidebar';
 
 // Import section components
-import { AccountSection, AboutSection, ProviderSection } from './sections';
+import { AccountSection, AboutSection, ProviderSection, McpSection } from './sections';
 
 // Import types and hooks
 import type { SettingsSection } from './SettingsLayout';
-import type { AppConfig, Provider } from '@/config/types';
+import type { AppConfig, Provider, McpServerDefinition } from '@/config/types';
 import type { SubscriptionStatusWithVerify } from '@/types/subscription';
 import { useConfig } from '@/hooks/useConfig';
 import { useAuth } from '@/context/AuthContext';
@@ -55,6 +55,40 @@ export default function Settings() {
   // Subscription status state (for ProviderSection)
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatusWithVerify | null>(null);
   const [subscriptionVerifying, setSubscriptionVerifying] = useState(false);
+
+  // MCP servers state
+  const [mcpServers, setMcpServers] = useState<McpServerDefinition[]>([]);
+  const [mcpEnabledIds, setMcpEnabledIds] = useState<string[]>([]);
+  const [mcpEnabling, setMcpEnabling] = useState<Record<string, boolean>>({});
+  const [mcpNeedsConfig, setMcpNeedsConfig] = useState<Record<string, boolean>>({});
+
+  // Load MCP servers on mount
+  useEffect(() => {
+    const loadMcpServers = async () => {
+      try {
+        const { getAllMcpServers, getEnabledMcpServerIds, getMcpServerEnv } = await import('@/config/configService');
+        const servers = await getAllMcpServers();
+        const enabledIds = await getEnabledMcpServerIds();
+
+        // Compute needsConfig for servers that require config
+        const needsConfig: Record<string, boolean> = {};
+        for (const server of servers) {
+          if (server.requiresConfig && server.requiresConfig.length > 0) {
+            const savedEnv = await getMcpServerEnv(server.id);
+            const hasConfig = server.requiresConfig.some(key => savedEnv?.[key]?.trim());
+            needsConfig[server.id] = !hasConfig;
+          }
+        }
+
+        setMcpServers(servers);
+        setMcpEnabledIds(enabledIds);
+        setMcpNeedsConfig(needsConfig);
+      } catch (err) {
+        console.error('[Settings] Failed to load MCP servers:', err);
+      }
+    };
+    loadMcpServers();
+  }, []);
 
   // Load QR code when entering about section
   useEffect(() => {
@@ -115,6 +149,54 @@ export default function Settings() {
     toast.info('添加供应商功能开发中');
   };
 
+  const handleDeleteProvider = (provider: Provider) => {
+    // TODO: Delete provider functionality
+    toast.info(`删除 ${provider.name} 功能将在后续版本实现`);
+  };
+
+  // MCP handlers
+  const handleMcpToggle = (server: McpServerDefinition, enabled: boolean) => {
+    if (!enabled) {
+      setMcpEnabledIds(prev => prev.filter(id => id !== server.id));
+      return;
+    }
+    // For enabling, McpSection handles the full flow
+    setMcpEnabling(prev => ({ ...prev, [server.id]: true }));
+    // The actual toggle is handled in McpSection, but we need to update state after
+    // For now, we just track enabling state
+  };
+
+  const handleEditMcp = (server: McpServerDefinition) => {
+    toast.info(`编辑 ${server.name} 功能开发中`);
+  };
+
+  const handleEditBuiltinMcp = (server: McpServerDefinition) => {
+    // This will be wired to open the config panels
+    // For now, just log which server was clicked
+    console.log('[Settings] Edit builtin MCP:', server.id, server.name);
+  };
+
+  const handleAddMcp = () => {
+    toast.info('添加 MCP 服务器功能开发中');
+  };
+
+  const handleMcpServersChange = (servers: McpServerDefinition[]) => {
+    setMcpServers(servers);
+  };
+
+  const handleMcpToggleComplete = (serverId: string, enabled: boolean) => {
+    setMcpEnabling(prev => {
+      const next = { ...prev };
+      delete next[serverId];
+      return next;
+    });
+    if (enabled) {
+      setMcpEnabledIds(prev => [...prev, serverId]);
+    } else {
+      setMcpEnabledIds(prev => prev.filter(id => id !== serverId));
+    }
+  };
+
   return (
     <div className="h-full">
       <SettingsLayout
@@ -146,13 +228,27 @@ export default function Settings() {
             onApiKeyChange={handleApiKeyChange}
             onReVerifySubscription={handleReVerifySubscription}
             onManageProvider={handleManageProvider}
+            onDeleteProvider={handleDeleteProvider}
             onAddProvider={handleAddProvider}
+          />
+        )}
+
+        {activeSection === 'mcp' && (
+          <McpSection
+            servers={mcpServers}
+            enabledIds={mcpEnabledIds}
+            enablingIds={mcpEnabling}
+            needsConfig={mcpNeedsConfig}
+            onAddServer={handleAddMcp}
+            onEditServer={handleEditMcp}
+            onEditBuiltinServer={handleEditBuiltinMcp}
+            onToggleServer={handleMcpToggle}
+            onServersChange={handleMcpServersChange}
           />
         )}
 
         {/* Placeholder for other sections - will be implemented in later phases */}
         {(activeSection === 'general' ||
-          activeSection === 'mcp' ||
           activeSection === 'skills' ||
           activeSection === 'sub-agents' ||
           activeSection === 'agent' ||
