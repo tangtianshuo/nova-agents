@@ -4,6 +4,13 @@
 import { Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/Toast';
+import {
+  DEFAULT_CONFIG,
+  type PlaywrightConfig,
+  type StorageStateInfo,
+  KNOWN_BROWSERS,
+  DEVICE_PRESETS,
+} from './PlaywrightConfig';
 
 export interface PlaywrightConfigPanelProps {
   open: boolean;
@@ -13,51 +20,7 @@ export interface PlaywrightConfigPanelProps {
   onCancel: () => void;
 }
 
-export interface PlaywrightConfig {
-  mode: 'persistent' | 'isolated';
-  headless: boolean;
-  browser: string;
-  device: string;
-  customDevice: string;
-  userDataDir: string;
-  extraArgs: string[];
-}
-
-interface StorageStateInfo {
-  exists: boolean;
-  cookieCount: number;
-  domains: string[];
-  cookies: Array<{
-    name: string;
-    value: string;
-    domain: string;
-    path: string;
-    secure: boolean;
-    httpOnly: boolean;
-  }>;
-}
-
-const DEFAULT_CONFIG: PlaywrightConfig = {
-  mode: 'persistent',
-  headless: false,
-  browser: '',
-  device: '',
-  customDevice: '',
-  userDataDir: '',
-  extraArgs: [],
-};
-
-const KNOWN_BROWSERS = [
-  { id: '', label: '默认 (Chromium)' },
-  { id: 'chrome', label: 'Chrome' },
-  { id: 'firefox', label: 'Firefox' },
-  { id: 'webkit', label: 'WebKit' },
-  { id: 'msedge', label: 'Edge' },
-];
-
-const DEVICE_PRESETS = [
-  'iPhone 12',
-  'iPhone 12 Pro',
+const MODE_OPTIONS = [
   'iPhone SE',
   'iPad',
   'Galaxy S8',
