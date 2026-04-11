@@ -8,11 +8,12 @@ import SettingsLayout from './SettingsLayout';
 import SettingsSidebar from './SettingsSidebar';
 
 // Import section components
-import { AccountSection, AboutSection } from './sections';
+import { AccountSection, AboutSection, ProviderSection } from './sections';
 
 // Import types and hooks
 import type { SettingsSection } from './SettingsLayout';
-import type { AppConfig } from '@/config/types';
+import type { AppConfig, Provider } from '@/config/types';
+import type { SubscriptionStatusWithVerify } from '@/types/subscription';
 import { useConfig } from '@/hooks/useConfig';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
@@ -30,7 +31,7 @@ import { apiGetJson } from '@/api/apiFetch';
 const VALID_SECTIONS: SettingsSection[] = ['general', 'providers', 'mcp', 'skills', 'sub-agents', 'agent', 'usage-stats', 'about', 'account'];
 
 export default function Settings() {
-  const { config } = useConfig();
+  const { config, providers, apiKeys, providerVerifyStatus } = useConfig();
   const { user } = useAuth();
   const toast = useToast();
 
@@ -50,6 +51,10 @@ export default function Settings() {
   // QR code state for AboutSection
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [qrCodeLoading, setQrCodeLoading] = useState(false);
+
+  // Subscription status state (for ProviderSection)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatusWithVerify | null>(null);
+  const [subscriptionVerifying, setSubscriptionVerifying] = useState(false);
 
   // Load QR code when entering about section
   useEffect(() => {
@@ -89,6 +94,27 @@ export default function Settings() {
     setActiveSection(section);
   };
 
+  // ProviderSection handlers
+  const handleApiKeyChange = (providerId: string, apiKey: string) => {
+    // API key changes are handled within ProviderSection via saveApiKey
+    console.log('[Settings] API key changed for provider:', providerId);
+  };
+
+  const handleReVerifySubscription = () => {
+    // TODO: Wire up subscription re-verification
+    toast.info('订阅验证功能开发中');
+  };
+
+  const handleManageProvider = (provider: Provider) => {
+    // TODO: Open provider management dialog
+    toast.info(`管理 ${provider.name} 功能开发中`);
+  };
+
+  const handleAddProvider = () => {
+    // TODO: Open add provider dialog
+    toast.info('添加供应商功能开发中');
+  };
+
   return (
     <div className="h-full">
       <SettingsLayout
@@ -97,19 +123,35 @@ export default function Settings() {
         config={config}
       >
         {/* Section routing */}
-        {activeSection === 'account' && <AccountSection user={user} />}
+        {activeSection === 'account' && <AccountSection user={user ?? undefined} />}
 
         {activeSection === 'about' && (
           <AboutSection
             appVersion={appVersion}
             qrCodeDataUrl={qrCodeDataUrl}
             qrCodeLoading={qrCodeLoading}
+            providers={providers}
+            apiKeys={apiKeys ?? {}}
+            providerVerifyStatus={providerVerifyStatus ?? {}}
+          />
+        )}
+
+        {activeSection === 'providers' && (
+          <ProviderSection
+            providers={providers}
+            apiKeys={apiKeys ?? {}}
+            providerVerifyStatus={providerVerifyStatus ?? {}}
+            subscriptionStatus={subscriptionStatus}
+            subscriptionVerifying={subscriptionVerifying}
+            onApiKeyChange={handleApiKeyChange}
+            onReVerifySubscription={handleReVerifySubscription}
+            onManageProvider={handleManageProvider}
+            onAddProvider={handleAddProvider}
           />
         )}
 
         {/* Placeholder for other sections - will be implemented in later phases */}
         {(activeSection === 'general' ||
-          activeSection === 'providers' ||
           activeSection === 'mcp' ||
           activeSection === 'skills' ||
           activeSection === 'sub-agents' ||
