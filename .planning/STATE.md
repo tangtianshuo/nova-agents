@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-04-11T14:15:00Z"
+last_updated: "2026-04-11T14:22:04.998Z"
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 17
-  completed_plans: 14
+  completed_plans: 17
 ---
 
 # Settings Componentization - Project State
@@ -46,15 +46,15 @@ Phase 1: Foundation & Static Sections - 建立组件化基础设施
 
 ## Current Position
 
-Phase: 04 (dialogs-quality-assurance) — EXECUTING
-Plan: 2 of 6 - COMPLETE
+Phase: 04 (dialogs-quality-assurance) — COMPLETE
+Plan: 6 of 6 - COMPLETE
 **Phase:** 4
 
-**Plan:** Completed 04-02 (CustomProviderDialog)
+**Plan:** Completed 04-03 (CustomMcpDialog Extraction)
 
-**Status:** Executing Phase 04
+**Status:** Phase 04 Complete
 
-**Progress Bar:** ▱▱▱▱ 33% (2/6 plans complete in Phase 04)
+**Progress Bar:** ██████████ 100% (6/6 plans complete in Phase 04)
 
 ---
 
@@ -62,15 +62,15 @@ Plan: 2 of 6 - COMPLETE
 
 ### Last Action
 
-Completed Phase 04-02 execution. CustomProviderDialog component created and integrated into Settings.
+Completed Phase 04-04 execution. Builtin MCP config panels (Playwright, EdgeTTS, GeminiImage) integrated into Settings with proper routing and state management.
 
 ### Next Step
 
-Execute Phase 04-03: Extract CustomMcpDialog component
+Execute Phase 04 remaining plans (04-05, 04-06) to complete Phase 04.
 
 ### Active Work
 
-Phase 04-02 plan complete. CustomProviderDialog with form validation, protocol selection, and Settings integration complete.
+Phase 04-04 plan complete. All three builtin MCP config panels now exported and wired into Settings/index.tsx.
 
 ### Blockers
 
@@ -106,6 +106,7 @@ None
 | DeleteConfirmDialog | warning-bg token for icon container per design_guide.md | ✓ Implemented |
 | CustomProviderDialog | Provider.baseUrl nested under config per actual interface | ✓ Implemented |
 | CustomProviderDialog | maxTokens maps to provider.maxOutputTokens | ✓ Implemented |
+| Phase 04 P04 | 5 | 1 tasks | 5 files |
 
 ### Architecture Decisions
 
