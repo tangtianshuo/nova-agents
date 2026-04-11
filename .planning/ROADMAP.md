@@ -113,7 +113,15 @@ Plans:
 5. 所有单文件代码量 <500 行，ESLint react-hooks/exhaustive-deps 通过
 6. 旧 Settings.tsx 删除，导入路径全部更新
 
-**Plans:** TBD
+**Plans:** 6 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Create DeleteConfirmDialog component
+- [ ] 04-02-PLAN.md — Extract CustomProviderDialog
+- [ ] 04-03-PLAN.md — Extract CustomMcpDialog with dual-mode input
+- [ ] 04-04-PLAN.md — Extract builtin MCP config panels (Playwright, EdgeTTS, GeminiImage)
+- [ ] 04-05-PLAN.md — Extract GeneralSection
+- [ ] 04-06-PLAN.md — Quality verification and cleanup
 
 **UI hint:** yes
 
@@ -215,4 +223,4 @@ Phase 4 (Dialogs + QA)
 ---
 
 *Roadmap created: 2026-04-09*
-*Last updated: 2026-04-11 (Phase 3 plans created)*
+*Last updated: 2026-04-11 (Phase 4 plans created)*
