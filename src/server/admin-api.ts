@@ -931,7 +931,7 @@ export function handleVersion(): AdminResponse {
   // NOVA_AGENTS_VERSION can be injected by the build system as a fallback.
   const version = process.env.npm_package_version
     ?? process.env.NOVA_AGENTS_VERSION
-    ?? '0.1.51';
+    ?? '0.2.0';
   return { success: true, data: { version } };
 }
 

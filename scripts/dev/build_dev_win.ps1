@@ -173,11 +173,11 @@ Write-ColorOutput "✓ 前端构建完成" "Green"
 Write-Host ""
 
 # 强制触发 Rust 重新编译 (确保 sidecar.rs 的逻辑修改生效)
-# 使用覆盖模式，避免时间戳累积污染源文件
+# 只更新时间戳，不修改文件内容
 $sidecarFile = Join-Path $PROJECT_DIR "src-tauri/src/sidecar.rs"
 $mainFile = Join-Path $PROJECT_DIR "src-tauri/src/main.rs"
-"# trigger rebuild: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $sidecarFile -Encoding UTF8
-"# trigger rebuild: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath $mainFile -Encoding UTF8
+(Get-Item $sidecarFile).LastWriteTime = Get-Date
+(Get-Item $mainFile).LastWriteTime = Get-Date
 
 # 构建 Tauri 应用
 Write-ColorOutput "[3/3] 构建 Tauri 应用 (Debug 模式, NSIS)..." "Blue"
