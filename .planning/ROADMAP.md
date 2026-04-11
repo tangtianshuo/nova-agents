@@ -86,7 +86,7 @@ Plans:
 4. MCP 配置面板集成正常（Playwright、Edge TTS、Gemini Image）
 5. 区块内状态局部化，无全局状态污染
 
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 - [x] 03-01-PLAN.md — Extract ProviderSection container
@@ -125,7 +125,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Foundation & Static Sections | 5/5 | Done | 2026-04-10 |
 | 2. Shared Components & Business Logic | 0/5 | Not started | - |
-| 3. Complex Sections Migration | 1/3 | In progress | - |
+| 3. Complex Sections Migration | 1/3 | In Progress|  |
 | 4. Dialogs & Quality Assurance | 0/6 | Not started | - |
 
 ---
