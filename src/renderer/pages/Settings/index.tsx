@@ -8,7 +8,7 @@ import SettingsLayout from './SettingsLayout';
 import SettingsSidebar from './SettingsSidebar';
 
 // Import section components
-import { AccountSection, AboutSection, ProviderSection, McpSection } from './sections';
+import { AccountSection, AboutSection, ProviderSection, McpSection, GeneralSection } from './sections';
 
 // Import dialog components
 import {
@@ -28,7 +28,7 @@ import type {
 
 // Import types and hooks
 import type { SettingsSection } from './SettingsLayout';
-import type { AppConfig, Provider, McpServerDefinition } from '@/config/types';
+import type { AppConfig, Provider, McpServerDefinition, Project } from '@/config/types';
 import type { SubscriptionStatusWithVerify } from '@/types/subscription';
 import { useConfig } from '@/hooks/useConfig';
 import { useAuth } from '@/context/AuthContext';
@@ -93,6 +93,13 @@ export default function Settings() {
   const [builtinPanelType, setBuiltinPanelType] = useState<'playwright' | 'edge-tts' | 'gemini-image' | null>(null);
   const [builtinPanelData, setBuiltinPanelData] = useState<PlaywrightConfig | EdgeTtsConfig | GeminiImageConfig | undefined>();
 
+  // Workspaces state (for GeneralSection)
+  const [workspaces, setWorkspaces] = useState<Project[]>([]);
+
+  // Autostart state (for GeneralSection)
+  const [autostartEnabled, setAutostartEnabled] = useState(false);
+  const [autostartLoading, setAutostartLoading] = useState(false);
+
   // Load MCP servers on mount
   useEffect(() => {
     const loadMcpServers = async () => {
@@ -119,6 +126,37 @@ export default function Settings() {
       }
     };
     loadMcpServers();
+  }, []);
+
+  // Load workspaces on mount (for GeneralSection)
+  useEffect(() => {
+    const loadWorkspaces = async () => {
+      try {
+        const { loadProjects } = await import('@/config/services/projectService');
+        const ws = await loadProjects();
+        setWorkspaces(ws);
+      } catch (err) {
+        console.error('[Settings] Failed to load workspaces:', err);
+      }
+    };
+    loadWorkspaces();
+  }, []);
+
+  // Load autostart state on mount (for GeneralSection)
+  useEffect(() => {
+    const loadAutostart = async () => {
+      if (!isTauriEnvironment()) {
+        setAutostartEnabled(false);
+        return;
+      }
+      try {
+        const enabled = await invoke<boolean>('cmd_get_autostart_enabled');
+        setAutostartEnabled(enabled);
+      } catch (err) {
+        console.error('[Settings] Failed to load autostart:', err);
+      }
+    };
+    loadAutostart();
   }, []);
 
   // Load QR code when entering about section
@@ -158,6 +196,30 @@ export default function Settings() {
   const handleSectionChange = (section: SettingsSection) => {
     setActiveSection(section);
   };
+
+  // GeneralSection handlers
+  const handleUpdateConfig = useCallback(async (updates: Partial<AppConfig>) => {
+    try {
+      const { atomicModifyConfig } = await import('@/config/services/appConfigService');
+      await atomicModifyConfig((current) => ({ ...current, ...updates }));
+    } catch (err) {
+      console.error('[Settings] Failed to update config:', err);
+    }
+  }, []);
+
+  const handleToggleAutostart = useCallback(async (): Promise<boolean> => {
+    setAutostartLoading(true);
+    try {
+      const success = await invoke<boolean>('cmd_toggle_autostart', { enable: !autostartEnabled });
+      setAutostartEnabled(success);
+      return success;
+    } catch (err) {
+      console.error('[Settings] Failed to toggle autostart:', err);
+      return false;
+    } finally {
+      setAutostartLoading(false);
+    }
+  }, [autostartEnabled]);
 
   // ProviderSection handlers
   const handleApiKeyChange = (providerId: string, apiKey: string) => {
@@ -324,8 +386,19 @@ export default function Settings() {
           />
         )}
 
+        {activeSection === 'general' && (
+          <GeneralSection
+            config={config}
+            autostartEnabled={autostartEnabled}
+            autostartLoading={autostartLoading}
+            workspaces={workspaces}
+            onUpdateConfig={handleUpdateConfig}
+            onToggleAutostart={handleToggleAutostart}
+          />
+        )}
+
         {/* Placeholder for other sections - will be implemented in later phases */}
-        {(activeSection === 'general' ||
+        {(
           activeSection === 'skills' ||
           activeSection === 'sub-agents' ||
           activeSection === 'agent' ||
