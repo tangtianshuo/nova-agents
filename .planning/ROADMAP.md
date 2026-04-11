@@ -17,7 +17,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Foundation & Static Sections** - 布局架构 + 目录结构 + 静态区块
+- [x] **Phase 1: Foundation & Static Sections** - 布局架构 + 目录结构 + 静态区块
 - [ ] **Phase 2: Shared Components & Business Logic** - 共享组件 + 业务逻辑 Hooks
 - [ ] **Phase 3: Complex Sections Migration** - 供应商管理 + MCP 工具管理
 - [ ] **Phase 4: Dialogs & Quality Assurance** - 对话框组件 + 质量验证 + 清理
@@ -44,11 +44,11 @@
 **Plans:** 5 plans
 
 Plans:
-- [ ] 01-foundation-01-PLAN.md — Create Settings/ directory structure
-- [ ] 01-foundation-02-PLAN.md — Create SettingsLayout component
-- [ ] 01-foundation-03-PLAN.md — Create SettingsSidebar component
-- [ ] 01-foundation-04-PLAN.md — Migrate AccountSection
-- [ ] 01-foundation-05-PLAN.md — Refactor index.tsx as composition root + Migrate AboutSection
+- [x] 01-foundation-01-PLAN.md — Create Settings/ directory structure
+- [x] 01-foundation-02-PLAN.md — Create SettingsLayout component
+- [x] 01-foundation-03-PLAN.md — Create SettingsSidebar component
+- [x] 01-foundation-04-PLAN.md — Migrate AccountSection
+- [x] 01-foundation-05-PLAN.md — Refactor index.tsx as composition root + Migrate AboutSection
 
 ---
 
@@ -86,7 +86,12 @@ Plans:
 4. MCP 配置面板集成正常（Playwright、Edge TTS、Gemini Image）
 5. 区块内状态局部化，无全局状态污染
 
-**Plans:** TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Extract ProviderSection container
+- [ ] 03-02-PLAN.md — Extract McpSection container
+- [ ] 03-03-PLAN.md — Extract ProviderCard and McpServerCard components
 
 **UI hint:** yes
 
@@ -118,9 +123,9 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Static Sections | 0/5 | Planned | - |
+| 1. Foundation & Static Sections | 5/5 | Done | 2026-04-10 |
 | 2. Shared Components & Business Logic | 0/5 | Not started | - |
-| 3. Complex Sections Migration | 0/5 | Not started | - |
+| 3. Complex Sections Migration | 0/3 | Planned | - |
 | 4. Dialogs & Quality Assurance | 0/6 | Not started | - |
 
 ---
@@ -210,4 +215,4 @@ Phase 4 (Dialogs + QA)
 ---
 
 *Roadmap created: 2026-04-09*
-*Last updated: 2026-04-09 (Phase 1 plans completed)*
+*Last updated: 2026-04-11 (Phase 3 plans created)*
