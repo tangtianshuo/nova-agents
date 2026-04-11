@@ -7,10 +7,8 @@ import {
   AlertCircle,
   Settings2,
   Trash2,
-  ExternalLink as ExternalLinkIcon,
 } from 'lucide-react';
 import { ExternalLink } from '@/components/ExternalLink';
-import { useToast } from '@/components/Toast';
 import {
   getModelsDisplay,
   type Provider,
@@ -37,22 +35,6 @@ interface VerifyError {
   detail?: string;
 }
 
-interface SubscriptionStatus {
-  available: boolean;
-  info?: {
-    email?: string;
-  };
-  verifyStatus?: 'idle' | 'loading' | 'valid' | 'invalid';
-  verifyError?: string;
-}
-
-interface ProviderCardState {
-  verifyLoading: boolean;
-  verifyError: Record<string, VerifyError>;
-  errorDetailOpenId: string | null;
-  showDeleteConfirm: boolean;
-}
-
 /**
  * ProviderCard - Reusable provider card with inline delete confirmation
  *
@@ -73,8 +55,6 @@ export default function ProviderCard({
   onManage,
   onDelete,
 }: ProviderCardProps) {
-  const toast = useToast();
-
   // Local state for verification and delete confirmation
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [localVerifyError, setLocalVerifyError] = useState<VerifyError | null>(null);
@@ -85,13 +65,6 @@ export default function ProviderCard({
 
   // Use prop-provided verifyError or local one
   const effectiveError = verifyError ?? localVerifyError ?? null;
-
-  // Close error detail popover when clicking outside
-  const handleErrorDetailClick = useCallback((e: React.MouseEvent) => {
-    if (errorDetailPopoverRef.current && !errorDetailPopoverRef.current.contains(e.target as Node)) {
-      setErrorDetailOpen(false);
-    }
-  }, []);
 
   // Debounced API key change
   const handleApiKeyInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

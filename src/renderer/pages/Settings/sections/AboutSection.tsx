@@ -1,20 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { ExternalLink } from '@/components/ExternalLink';
-import { BugReportOverlay } from '@/components/BugReportOverlay';
+import BugReportOverlay from '@/components/BugReportOverlay';
 import { getBuildVersions } from '@/utils/debug';
 import { isDeveloperSectionUnlocked, unlockDeveloperSection, UNLOCK_CONFIG } from '@/utils/developerMode';
+import type { Provider, ProviderVerifyStatus } from '@/config/types';
 
 export interface AboutSectionProps {
   appVersion: string;
   qrCodeDataUrl: string | null;
   qrCodeLoading: boolean;
+  providers: Provider[];
+  apiKeys: Record<string, string>;
+  providerVerifyStatus: Record<string, ProviderVerifyStatus>;
 }
 
 export default function AboutSection({
   appVersion,
   qrCodeDataUrl,
   qrCodeLoading,
+  providers,
+  apiKeys,
+  providerVerifyStatus,
 }: AboutSectionProps) {
   const [showBugReport, setShowBugReport] = useState(false);
   const [devSectionVisible, setDevSectionVisible] = useState(isDeveloperSectionUnlocked());
@@ -159,7 +166,14 @@ export default function AboutSection({
       )}
 
       {showBugReport && (
-        <BugReportOverlay onClose={() => setShowBugReport(false)} />
+        <BugReportOverlay
+          onClose={() => setShowBugReport(false)}
+          onNavigateToProviders={() => {}}
+          appVersion={appVersion}
+          providers={providers}
+          apiKeys={apiKeys}
+          providerVerifyStatus={providerVerifyStatus}
+        />
       )}
     </div>
   );

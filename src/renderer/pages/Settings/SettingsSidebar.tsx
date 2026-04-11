@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Settings2,
   Globe,
-  KeyRound,
   Sparkles,
   Bot,
   MessageSquare,
@@ -44,7 +43,7 @@ const SECTIONS = [
 export default function SettingsSidebar({
   activeSection,
   onSectionChange,
-  config,
+  config: _config,
 }: SettingsSidebarProps) {
   return (
     <nav className="flex h-full w-52 flex-col border-r border-[var(--line)] bg-[var(--paper)]">
@@ -82,11 +81,7 @@ export default function SettingsSidebar({
       </div>
 
       {/* Footer section */}
-      <div className="p-4 border-t border-[var(--line)]">
-        <div className="text-xs text-[var(--ink-subtle)]">
-          {config.version ?? 'Development'}
-        </div>
-      </div>
+      {/* Version display removed - AppConfig doesn't have version field */}
     </nav>
   );
 }

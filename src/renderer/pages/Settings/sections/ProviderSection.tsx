@@ -1,14 +1,17 @@
 import React, { useCallback } from 'react';
-import { Plus, Loader2, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useToast } from '@/components/Toast';
 import { type Provider } from '@/config/types';
-import { saveApiKey as saveApiKeyFn } from '@/config/services/providerService';
 import ProviderCard from '../components/ProviderCard';
 
 export interface ProviderSectionProps {
   providers: Provider[];
   apiKeys: Record<string, string>;
-  providerVerifyStatus: Record<string, any>;
+  providerVerifyStatus: Record<string, {
+    status: 'valid' | 'invalid';
+    verifiedAt: string;
+    accountEmail?: string;
+  }>;
   subscriptionStatus: SubscriptionStatus | null;
   subscriptionVerifying: boolean;
   onApiKeyChange: (providerId: string, apiKey: string) => void;
@@ -27,11 +30,6 @@ type SubscriptionStatus = {
   verifyError?: string;
 };
 
-interface VerifyError {
-  error: string;
-  detail?: string;
-}
-
 /**
  * ProviderSection - Display and manage model providers
  *
@@ -42,25 +40,24 @@ export default function ProviderSection({
   providers,
   apiKeys,
   providerVerifyStatus,
-  subscriptionStatus,
-  subscriptionVerifying,
+  subscriptionStatus: _subscriptionStatus,
+  subscriptionVerifying: _subscriptionVerifying,
   onApiKeyChange,
-  onReVerifySubscription,
-  onManageProvider,
-  onDeleteProvider,
+  onReVerifySubscription: _onReVerifySubscription,
+  onManageProvider: _onManageProvider,
+  onDeleteProvider: _onDeleteProvider,
   onAddProvider,
 }: ProviderSectionProps) {
   const toast = useToast();
 
   // Handle delete provider
-  const handleDeleteProvider = useCallback((provider: Provider) => {
+  const handleDeleteProvider = useCallback((_provider: Provider) => {
     // Placeholder for delete functionality
     toast.info('删除功能将在后续版本实现');
-    console.log('[ProviderSection] Delete provider:', provider.id);
   }, [toast]);
 
   // Handle verify provider callback for ProviderCard
-  const handleVerifyProvider = useCallback((provider: Provider) => {
+  const handleVerifyProvider = useCallback((_provider: Provider) => {
     toast.info('验证功能已集成到 ProviderCard');
   }, [toast]);
 

@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 
 // Import layout components
 import SettingsLayout from './SettingsLayout';
-import SettingsSidebar from './SettingsSidebar';
 
 // Import section components
 import { AccountSection, AboutSection, ProviderSection, McpSection, GeneralSection } from './sections';
@@ -44,8 +42,6 @@ import { apiGetJson } from '@/api/apiFetch';
  * Manages navigation state and composes the Settings layout.
  * Per D-04: activeSection state lifted to parent (index.tsx).
  */
-const VALID_SECTIONS: SettingsSection[] = ['general', 'providers', 'mcp', 'skills', 'sub-agents', 'agent', 'usage-stats', 'about', 'account'];
-
 export default function Settings() {
   const { config, providers, apiKeys, providerVerifyStatus } = useConfig();
   const { user } = useAuth();
@@ -69,8 +65,8 @@ export default function Settings() {
   const [qrCodeLoading, setQrCodeLoading] = useState(false);
 
   // Subscription status state (for ProviderSection)
-  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatusWithVerify | null>(null);
-  const [subscriptionVerifying, setSubscriptionVerifying] = useState(false);
+  const [subscriptionStatus] = useState<SubscriptionStatusWithVerify | null>(null);
+  const [subscriptionVerifying] = useState(false);
 
   // MCP servers state
   const [mcpServers, setMcpServers] = useState<McpServerDefinition[]>([]);
@@ -222,7 +218,7 @@ export default function Settings() {
   }, [autostartEnabled]);
 
   // ProviderSection handlers
-  const handleApiKeyChange = (providerId: string, apiKey: string) => {
+  const handleApiKeyChange = (providerId: string, _apiKey: string) => {
     // API key changes are handled within ProviderSection via saveApiKey
     console.log('[Settings] API key changed for provider:', providerId);
   };
@@ -321,19 +317,6 @@ export default function Settings() {
 
   const handleMcpServersChange = (servers: McpServerDefinition[]) => {
     setMcpServers(servers);
-  };
-
-  const handleMcpToggleComplete = (serverId: string, enabled: boolean) => {
-    setMcpEnabling(prev => {
-      const next = { ...prev };
-      delete next[serverId];
-      return next;
-    });
-    if (enabled) {
-      setMcpEnabledIds(prev => [...prev, serverId]);
-    } else {
-      setMcpEnabledIds(prev => prev.filter(id => id !== serverId));
-    }
   };
 
   return (

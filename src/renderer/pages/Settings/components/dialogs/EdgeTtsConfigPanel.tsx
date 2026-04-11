@@ -50,7 +50,7 @@ const SLIDER_CLASS =
 
 export default function EdgeTtsConfigPanel({
   open,
-  serverId,
+  serverId: _serverId,
   initialConfig,
   onSave,
   onCancel,

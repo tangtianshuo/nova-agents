@@ -67,7 +67,7 @@ const DEVICE_PRESETS = [
 
 export default function PlaywrightConfigPanel({
   open,
-  serverId,
+  serverId: _serverId,
   initialConfig,
   onSave,
   onCancel,
@@ -131,7 +131,7 @@ export default function PlaywrightConfigPanel({
             httpOnly: !!c.httpOnly,
           }));
           const domains = [...new Set(cookies.map((c: { domain: string }) => c.domain.replace(/^\./, '')))] as string[];
-          const fileStat = await stat(ssPath).catch(() => null);
+          await stat(ssPath).catch(() => null); // File exists check but stat not used
           setStorageStateInfo({
             exists: true,
             cookieCount: cookies.length,

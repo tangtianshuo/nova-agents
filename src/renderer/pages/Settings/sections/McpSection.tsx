@@ -35,8 +35,8 @@ export default function McpSection({
   onEditServer,
   onEditBuiltinServer,
   onToggleServer,
-  onServersChange,
-  onDeleteServer,
+  onServersChange: _onServersChange,
+  onDeleteServer: _onDeleteServer,
 }: McpSectionProps) {
   // Handle settings button click - routes to appropriate edit handler
   const handleSettingsClick = (server: McpServerDefinition) => {

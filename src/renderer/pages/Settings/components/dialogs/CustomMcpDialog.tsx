@@ -199,7 +199,7 @@ export default function CustomMcpDialog({
       }
 
       return { valid: true, error: '', data: servers };
-    } catch (err) {
+    } catch (_err) {
       return { valid: false, error: 'JSON 格式无效' };
     }
   }, [jsonInput]);
@@ -223,7 +223,7 @@ export default function CustomMcpDialog({
       setIsSaving(true);
       try {
         await onSave(formData);
-      } catch (err) {
+      } catch (_err) {
         toast.error('保存失败');
       } finally {
         setIsSaving(false);
@@ -242,13 +242,13 @@ export default function CustomMcpDialog({
         if (data && data.length > 0) {
           await onSave(data[0]);
         }
-      } catch (err) {
+      } catch (_err) {
         toast.error('保存失败');
       } finally {
         setIsSaving(false);
       }
     }
-  }, [mcpFormMode, formData, jsonInput, validateForm, validateJson, onSave, toast]);
+  }, [mcpFormMode, formData, validateForm, validateJson, onSave, toast]);
 
   // Close handler
   const handleClose = useCallback(() => {

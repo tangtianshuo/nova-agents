@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { LogOut, User, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
-import { CUSTOM_EVENTS } from '@/shared/constants';
+import { CUSTOM_EVENTS } from '../../../../shared/constants';
 
 export interface AccountSectionProps {
   /** Optional override for user data (for testing) */
@@ -57,7 +57,7 @@ export default function AccountSection({ user: userProp }: AccountSectionProps) 
                 <User className="h-6 w-6 text-[var(--accent-warm)]" />
               </div>
               <div>
-                <p className="font-medium text-[var(--ink)]">{user.username || `用户 ${user.userId.slice(0, 8)}`}</p>
+                <p className="font-medium text-[var(--ink)]">{user.username || (user.userId ? `用户 ${user.userId.slice(0, 8)}` : '匿名用户')}</p>
                 <p className="text-sm text-[var(--ink-muted)]">ID: {user.userId}</p>
               </div>
             </div>

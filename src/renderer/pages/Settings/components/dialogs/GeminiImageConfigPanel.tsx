@@ -82,7 +82,7 @@ const THINKING_LEVELS = [
 
 export default function GeminiImageConfigPanel({
   open,
-  serverId,
+  serverId: _serverId,
   initialConfig,
   onSave,
   onCancel,
