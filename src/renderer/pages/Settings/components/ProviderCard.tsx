@@ -144,7 +144,9 @@ export default function ProviderCard({
   // Render verification status indicator (icon row)
   const renderVerifyStatus = () => {
     const isLoading = verifyLoading;
-    const cachedStatus = verifyStatus?.status;
+    const statusValue = verifyStatus?.status;
+    // If no status exists, treat as 'idle' - explicitly type to include 'idle'
+    const cachedStatus: 'valid' | 'invalid' | 'idle' = (statusValue ?? 'idle') as 'valid' | 'invalid' | 'idle';
     const hasKey = !!apiKey;
 
     if (!hasKey) {
@@ -168,7 +170,7 @@ export default function ProviderCard({
             <AlertCircle className="h-4 w-4 text-[var(--error)]" />
           </div>
         )}
-        {!isLoading && (!cachedStatus || cachedStatus === 'idle') && (
+        {!isLoading && cachedStatus === 'idle' && (
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--warning-bg)]" title="待验证">
             <AlertCircle className="h-4 w-4 text-[var(--warning)]" />
           </div>

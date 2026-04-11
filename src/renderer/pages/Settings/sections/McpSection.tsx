@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, ExternalLink as ExternalLinkIcon } from 'lucide-react';
 import { ExternalLink } from '@/components/ExternalLink';
 import {
   type McpServerDefinition,
@@ -99,7 +99,7 @@ export default function McpSection({
               className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--paper-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--ink)] shadow-sm transition-colors hover:bg-[var(--info-bg)] hover:text-[var(--info)]"
             >
               {link.name}
-              <ExternalLink.Icon className="h-3 w-3" />
+              <ExternalLinkIcon className="h-3 w-3" />
             </ExternalLink>
           ))}
         </div>

@@ -130,7 +130,7 @@ export default function PlaywrightConfigPanel({
             secure: !!c.secure,
             httpOnly: !!c.httpOnly,
           }));
-          const domains = [...new Set(cookies.map((c: { domain: string }) => c.domain.replace(/^\./, '')))].sort();
+          const domains = [...new Set(cookies.map((c: { domain: string }) => c.domain.replace(/^\./, '')))] as string[];
           const fileStat = await stat(ssPath).catch(() => null);
           setStorageStateInfo({
             exists: true,

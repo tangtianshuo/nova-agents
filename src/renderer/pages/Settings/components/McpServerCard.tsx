@@ -1,5 +1,6 @@
 import React from 'react';
 import { Globe, Loader2, Settings2 } from 'lucide-react';
+import { type McpServerType } from '@/config/types';
 
 /**
  * McpServerCard Props - matches UI-SPEC exactly
@@ -9,6 +10,7 @@ export interface McpServerCardProps {
     id: string;
     name: string;
     description?: string;
+    type: McpServerType;
     isBuiltin: boolean;
     isFree?: boolean;
     command?: string;
