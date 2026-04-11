@@ -11,8 +11,20 @@ import SettingsSidebar from './SettingsSidebar';
 import { AccountSection, AboutSection, ProviderSection, McpSection } from './sections';
 
 // Import dialog components
-import { CustomProviderDialog, CustomMcpDialog } from './components/dialogs';
-import type { CustomProviderFormData, McpFormData } from './components/dialogs';
+import {
+  CustomProviderDialog,
+  CustomMcpDialog,
+  PlaywrightConfigPanel,
+  EdgeTtsConfigPanel,
+  GeminiImageConfigPanel,
+} from './components/dialogs';
+import type {
+  CustomProviderFormData,
+  McpFormData,
+  PlaywrightConfig,
+  EdgeTtsConfig,
+  GeminiImageConfig,
+} from './components/dialogs';
 
 // Import types and hooks
 import type { SettingsSection } from './SettingsLayout';
@@ -75,6 +87,11 @@ export default function Settings() {
   const [customMcpOpen, setCustomMcpOpen] = useState(false);
   const [customMcpMode, setCustomMcpMode] = useState<'add' | 'edit'>('add');
   const [customMcpData, setCustomMcpData] = useState<McpFormData | undefined>();
+
+  // Builtin MCP config panel state
+  const [builtinPanelOpen, setBuiltinPanelOpen] = useState(false);
+  const [builtinPanelType, setBuiltinPanelType] = useState<'playwright' | 'edge-tts' | 'gemini-image' | null>(null);
+  const [builtinPanelData, setBuiltinPanelData] = useState<PlaywrightConfig | EdgeTtsConfig | GeminiImageConfig | undefined>();
 
   // Load MCP servers on mount
   useEffect(() => {
@@ -211,9 +228,11 @@ export default function Settings() {
   };
 
   const handleEditBuiltinMcp = (server: McpServerDefinition) => {
-    // This will be wired to open the config panels
-    // For now, just log which server was clicked
-    console.log('[Settings] Edit builtin MCP:', server.id, server.name);
+    // Determine panel type from server ID
+    const panelType = server.id.replace('-mcp', '').replace('mcp-', '') as 'playwright' | 'edge-tts' | 'gemini-image';
+    setBuiltinPanelType(panelType);
+    setBuiltinPanelData(undefined); // Load actual config from service
+    setBuiltinPanelOpen(true);
   };
 
   const handleAddMcp = () => {
@@ -229,6 +248,14 @@ export default function Settings() {
     setCustomMcpOpen(false);
     // Refresh MCP list after save
   }, [toast]);
+
+  const handleSaveBuiltinPanel = useCallback(async (config: PlaywrightConfig | EdgeTtsConfig | GeminiImageConfig) => {
+    // TODO: Implement builtin MCP config save logic (call config service)
+    console.log('[Settings] Saving builtin MCP config:', builtinPanelType, config);
+    toast.info('配置保存功能开发中');
+    setBuiltinPanelOpen(false);
+    // Refresh MCP config after save
+  }, [builtinPanelType, toast]);
 
   const handleMcpServersChange = (servers: McpServerDefinition[]) => {
     setMcpServers(servers);
@@ -329,6 +356,39 @@ export default function Settings() {
         onSave={handleSaveMcp}
         onCancel={() => setCustomMcpOpen(false)}
       />
+
+      {/* Playwright Config Panel */}
+      {builtinPanelType === 'playwright' && (
+        <PlaywrightConfigPanel
+          open={builtinPanelOpen}
+          serverId="playwright-mcp"
+          initialConfig={builtinPanelData as PlaywrightConfig | undefined}
+          onSave={handleSaveBuiltinPanel}
+          onCancel={() => setBuiltinPanelOpen(false)}
+        />
+      )}
+
+      {/* EdgeTTS Config Panel */}
+      {builtinPanelType === 'edge-tts' && (
+        <EdgeTtsConfigPanel
+          open={builtinPanelOpen}
+          serverId="edge-tts-mcp"
+          initialConfig={builtinPanelData as EdgeTtsConfig | undefined}
+          onSave={handleSaveBuiltinPanel}
+          onCancel={() => setBuiltinPanelOpen(false)}
+        />
+      )}
+
+      {/* GeminiImage Config Panel */}
+      {builtinPanelType === 'gemini-image' && (
+        <GeminiImageConfigPanel
+          open={builtinPanelOpen}
+          serverId="gemini-image-mcp"
+          initialConfig={builtinPanelData as GeminiImageConfig | undefined}
+          onSave={handleSaveBuiltinPanel}
+          onCancel={() => setBuiltinPanelOpen(false)}
+        />
+      )}
     </div>
   );
 }
