@@ -113,11 +113,11 @@ Plans:
 5. 所有单文件代码量 <500 行，ESLint react-hooks/exhaustive-deps 通过
 6. 旧 Settings.tsx 删除，导入路径全部更新
 
-**Plans:** 6 plans
+**Plans:** 2/6 plans executed
 
 Plans:
-- [ ] 04-01-PLAN.md — Create DeleteConfirmDialog component
-- [ ] 04-02-PLAN.md — Extract CustomProviderDialog
+- [x] 04-01-PLAN.md — Create DeleteConfirmDialog component
+- [x] 04-02-PLAN.md — Extract CustomProviderDialog
 - [ ] 04-03-PLAN.md — Extract CustomMcpDialog with dual-mode input
 - [ ] 04-04-PLAN.md — Extract builtin MCP config panels (Playwright, EdgeTTS, GeminiImage)
 - [ ] 04-05-PLAN.md — Extract GeneralSection
@@ -134,7 +134,7 @@ Plans:
 | 1. Foundation & Static Sections | 5/5 | Done | 2026-04-10 |
 | 2. Shared Components & Business Logic | 0/5 | Not started | - |
 | 3. Complex Sections Migration | 1/3 | In Progress|  |
-| 4. Dialogs & Quality Assurance | 0/6 | Not started | - |
+| 4. Dialogs & Quality Assurance | 2/6 | In Progress|  |
 
 ---
 
