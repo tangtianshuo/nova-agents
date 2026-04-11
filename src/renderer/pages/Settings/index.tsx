@@ -11,8 +11,8 @@ import SettingsSidebar from './SettingsSidebar';
 import { AccountSection, AboutSection, ProviderSection, McpSection } from './sections';
 
 // Import dialog components
-import { CustomProviderDialog } from './components/dialogs';
-import type { CustomProviderFormData } from './components/dialogs';
+import { CustomProviderDialog, CustomMcpDialog } from './components/dialogs';
+import type { CustomProviderFormData, McpFormData } from './components/dialogs';
 
 // Import types and hooks
 import type { SettingsSection } from './SettingsLayout';
@@ -70,6 +70,11 @@ export default function Settings() {
   const [customProviderOpen, setCustomProviderOpen] = useState(false);
   const [customProviderMode, setCustomProviderMode] = useState<'add' | 'edit'>('add');
   const [customProviderData, setCustomProviderData] = useState<CustomProviderFormData | undefined>();
+
+  // Custom MCP dialog state
+  const [customMcpOpen, setCustomMcpOpen] = useState(false);
+  const [customMcpMode, setCustomMcpMode] = useState<'add' | 'edit'>('add');
+  const [customMcpData, setCustomMcpData] = useState<McpFormData | undefined>();
 
   // Load MCP servers on mount
   useEffect(() => {
@@ -193,7 +198,16 @@ export default function Settings() {
   };
 
   const handleEditMcp = (server: McpServerDefinition) => {
-    toast.info(`编辑 ${server.name} 功能开发中`);
+    setCustomMcpMode('edit');
+    setCustomMcpData({
+      type: 'stdio',
+      id: server.id,
+      name: server.name,
+      command: server.command,
+      args: server.args,
+      env: {},
+    });
+    setCustomMcpOpen(true);
   };
 
   const handleEditBuiltinMcp = (server: McpServerDefinition) => {
@@ -203,8 +217,18 @@ export default function Settings() {
   };
 
   const handleAddMcp = () => {
-    toast.info('添加 MCP 服务器功能开发中');
+    setCustomMcpMode('add');
+    setCustomMcpData(undefined);
+    setCustomMcpOpen(true);
   };
+
+  const handleSaveMcp = useCallback(async (data: McpFormData) => {
+    // TODO: Implement MCP save logic (call config service)
+    console.log('[Settings] Saving MCP:', data);
+    toast.info('MCP 保存功能开发中');
+    setCustomMcpOpen(false);
+    // Refresh MCP list after save
+  }, [toast]);
 
   const handleMcpServersChange = (servers: McpServerDefinition[]) => {
     setMcpServers(servers);
@@ -295,6 +319,15 @@ export default function Settings() {
         initialData={customProviderData}
         onSave={handleSaveProvider}
         onCancel={() => setCustomProviderOpen(false)}
+      />
+
+      {/* Custom MCP Dialog */}
+      <CustomMcpDialog
+        open={customMcpOpen}
+        mode={customMcpMode}
+        initialData={customMcpData}
+        onSave={handleSaveMcp}
+        onCancel={() => setCustomMcpOpen(false)}
       />
     </div>
   );
