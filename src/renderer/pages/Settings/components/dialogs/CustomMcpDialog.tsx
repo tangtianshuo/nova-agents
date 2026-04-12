@@ -8,6 +8,12 @@ import CustomSelect from '@/components/CustomSelect';
 import { useToast } from '@/components/Toast';
 
 // Types
+/**
+ * CustomMcpDialog Props - Dialog for adding/editing custom MCP servers
+ *
+ * Supports dual-mode input: form-based (GUI) and JSON paste.
+ * Transport type selector (stdio/http/sse) changes form fields dynamically.
+ */
 export interface CustomMcpDialogProps {
   open: boolean;
   mode: 'add' | 'edit';

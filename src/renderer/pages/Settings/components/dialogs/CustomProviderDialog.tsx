@@ -1,5 +1,8 @@
 /**
- * CustomProviderDialog - Add/edit custom model provider dialog
+ * CustomProviderDialog - Add/edit custom model provider
+ *
+ * Modal dialog with form for adding or editing provider configuration.
+ * Supports OpenAI, Anthropic, and custom API protocols.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';

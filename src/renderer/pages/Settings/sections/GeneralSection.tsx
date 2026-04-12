@@ -3,6 +3,13 @@ import { useToast } from '@/components/Toast';
 import CustomSelect from '@/components/CustomSelect';
 import type { AppConfig, Project } from '@/config/types';
 
+/**
+ * GeneralSection - General settings (startup, theme, workspace)
+ *
+ * Contains auto-start toggle, theme selector, minimize to tray toggle,
+ * and default workspace selection. All props are required except
+ * autostartLoading which controls the toggle's loading state.
+ */
 export interface GeneralSectionProps {
   config: AppConfig;
   autostartEnabled: boolean;

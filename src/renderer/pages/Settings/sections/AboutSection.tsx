@@ -6,6 +6,12 @@ import { getBuildVersions } from '@/utils/debug';
 import { isDeveloperSectionUnlocked, unlockDeveloperSection, UNLOCK_CONFIG } from '@/utils/developerMode';
 import type { Provider, ProviderVerifyStatus } from '@/config/types';
 
+/**
+ * AboutSection Props - Display app version, QR code, and provider status
+ *
+ * Shows app version with build info, QR code for mobile app connection,
+ * and provider verification status summary.
+ */
 export interface AboutSectionProps {
   appVersion: string;
   qrCodeDataUrl: string | null;

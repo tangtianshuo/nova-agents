@@ -17,7 +17,10 @@ import {
 import { DeleteConfirmDialog } from './dialogs';
 
 /**
- * ProviderCard Props - matches UI-SPEC exactly
+ * ProviderCard - Display and manage a single model provider
+ *
+ * Shows provider name, API key input, verification status, and action buttons
+ * (verify, manage settings, delete). Used in ProviderSection grid layout.
  */
 export interface ProviderCardProps {
   provider: Provider;

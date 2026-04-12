@@ -90,7 +90,7 @@ export default function ProviderSection({
             verifyStatus={providerVerifyStatus[provider.id] || {}}
             onApiKeyChange={onApiKeyChange}
             onVerify={handleVerifyProvider}
-            onManage={onManageProvider}
+            onManage={_onManageProvider}
             onDelete={handleDeleteProvider}
           />
         ))}

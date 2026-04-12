@@ -1,5 +1,8 @@
 /**
  * PlaywrightConfigPanel - Playwright browser automation configuration panel
+ *
+ * Configuration panel for Playwright browser automation settings.
+ * Includes browser selection, viewport, headless mode, and device emulation.
  */
 import { Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -12,6 +15,9 @@ import {
   DEVICE_PRESETS,
 } from './PlaywrightConfig';
 
+/**
+ * PlaywrightConfigPanel Props
+ */
 export interface PlaywrightConfigPanelProps {
   open: boolean;
   serverId: string;
@@ -19,14 +25,6 @@ export interface PlaywrightConfigPanelProps {
   onSave: (config: PlaywrightConfig) => Promise<void>;
   onCancel: () => void;
 }
-
-const MODE_OPTIONS = [
-  'iPhone SE',
-  'iPad',
-  'Galaxy S8',
-  'Galaxy S20',
-  'Pixel 5',
-];
 
 export default function PlaywrightConfigPanel({
   open,

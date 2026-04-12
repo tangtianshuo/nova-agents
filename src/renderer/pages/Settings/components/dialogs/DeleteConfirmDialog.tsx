@@ -1,6 +1,15 @@
 import { useCallback, useRef, useState } from 'react';
 import { AlertTriangle, Loader2, X } from 'lucide-react';
 
+/**
+ * DeleteConfirmDialog Props - Reusable delete confirmation dialog
+ *
+ * Features:
+ * - Click-outside-to-close (prevents accidental dismissal during text selection)
+ * - Escape key handler
+ * - Loading state during deletion
+ * - Reusable for any deletion scenario (providers, MCPs, workspaces)
+ */
 export interface DeleteConfirmDialogProps {
   open: boolean;
   title: string;
@@ -11,15 +20,6 @@ export interface DeleteConfirmDialogProps {
   onCancel: () => void;
 }
 
-/**
- * DeleteConfirmDialog - Reusable delete confirmation dialog
- *
- * Features:
- * - Click-outside-to-close (prevents accidental dismissal during text selection)
- * - Escape key handler
- * - Loading state during deletion
- * - Reusable for any deletion scenario (providers, MCPs, workspaces)
- */
 export default function DeleteConfirmDialog({
   open,
   title,

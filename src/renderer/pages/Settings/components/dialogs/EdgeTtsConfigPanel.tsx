@@ -1,10 +1,16 @@
 /**
  * EdgeTtsConfigPanel - Edge TTS voice synthesis configuration panel
+ *
+ * Configuration panel for Edge TTS voice synthesis settings.
+ * Includes voice selection, rate, pitch, and volume controls.
  */
 import { Loader2, Play, Square, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/Toast';
 
+/**
+ * EdgeTtsConfigPanel Props
+ */
 export interface EdgeTtsConfigPanelProps {
   open: boolean;
   serverId: string;

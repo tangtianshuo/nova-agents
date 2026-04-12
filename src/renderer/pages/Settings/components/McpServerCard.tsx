@@ -3,7 +3,10 @@ import { Globe, Loader2, Settings2 } from 'lucide-react';
 import { type McpServerType } from '@/config/types';
 
 /**
- * McpServerCard Props - matches UI-SPEC exactly
+ * McpServerCard - Display and manage a single MCP server
+ *
+ * Shows server name, description, enable toggle, and settings button.
+ * Used in McpSection list layout with builtin servers and custom servers.
  */
 export interface McpServerCardProps {
   server: {

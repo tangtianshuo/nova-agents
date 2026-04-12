@@ -7,6 +7,12 @@ import {
 } from '@/config/types';
 import McpServerCard from '../components/McpServerCard';
 
+/**
+ * McpSection Props - Display and manage MCP servers
+ *
+ * Contains builtin MCP servers list, custom servers list, add/edit/delete functionality,
+ * and configuration panels for builtin MCP tools (Playwright, Edge TTS, Gemini Image).
+ */
 export interface McpSectionProps {
   servers: McpServerDefinition[];
   enabledIds: string[];

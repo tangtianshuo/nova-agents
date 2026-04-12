@@ -1,10 +1,16 @@
 /**
  * GeminiImageConfigPanel - Gemini Image generation configuration panel
+ *
+ * Configuration panel for Gemini Image generation settings.
+ * Includes API key, base URL, model selection, and aspect ratio.
  */
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/Toast';
 
+/**
+ * GeminiImageConfigPanel Props
+ */
 export interface GeminiImageConfigPanelProps {
   open: boolean;
   serverId: string;
