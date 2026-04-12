@@ -14,7 +14,18 @@ nova-agents 设置页面的**组件化重构项目**。将当前 5707 行的 Set
 
 ### Validated
 
-（None yet — ship to validate）
+| Requirement | Phase | Validated |
+|-------------|-------|-----------|
+| **QA-01**: 所有功能回归测试通过 | Phase 04 | ✓ |
+| **QA-02**: TypeScript 无 any 类型 | Phase 04 | ✓ |
+| **QA-03**: 单文件代码量 <500 行 | Phase 04 | ✓ |
+| **QA-04**: ESLint 无警告 | Phase 04 | ✓ |
+| **SECTION-02**: GeneralSection | Phase 04 | ✓ |
+| **DIALOG-01**: CustomProviderDialog | Phase 04 | ✓ |
+| **DIALOG-02**: CustomMcpDialog | Phase 04 | ✓ |
+| **DIALOG-03**: PlaywrightConfigPanel | Phase 04 | ✓ |
+| **DIALOG-04**: EdgeTtsConfigPanel | Phase 04 | ✓ |
+| **DIALOG-05**: GeminiImageConfigPanel | Phase 04 | ✓ |
 
 ### Active
 
@@ -128,4 +139,4 @@ nova-agents 设置页面的**组件化重构项目**。将当前 5707 行的 Set
 4. 用当前状态更新 Context
 
 ---
-*Last updated: 2026-04-09 after initialization*
+*Last updated: 2026-04-12 after Phase 04 completion*
