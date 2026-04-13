@@ -1,4 +1,4 @@
-﻿# nova-agents Windows 发布脚本
+# nova-agents Windows 发布脚本
 # 将构建产物上传到 Cloudflare R2，并生成更新清单
 #
 # 前置条件：
@@ -42,23 +42,22 @@ function Cleanup-TempFiles {
 
 try {
 
-$ProjectDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+# 引入统一路径变量
+. "$PSScriptRoot\..\paths_windows.ps1"
+
+# 切换到项目根目录
 Set-Location $ProjectDir
 
 # 读取版本号
-$TauriConf = Get-Content "src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json
-$Version = $TauriConf.version
-$BundleDir = Join-Path $ProjectDir "src-tauri\target"
-$EnvFile = Join-Path $ProjectDir ".env"
+$TauriConf = Get-Content $TauriConfPath -Raw | ConvertFrom-Json
 
-# 配置
-$R2Bucket = "nova-agents-releases"
-$DownloadBaseUrl = "https://download.nova-agents.io"
 
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "  nova-agents Windows 发布到 R2" -ForegroundColor Green
-Write-Host "  Version: $Version" -ForegroundColor Blue
+Write-Host "  Version: $($TauriConf.version)" -ForegroundColor Blue
+Write-Host "  Bucket: $R2Bucket" -ForegroundColor Blue
+Write-Host "  Download URL: $DownloadBaseUrl" -ForegroundColor Blue
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -67,13 +66,13 @@ Write-Host ""
 # ========================================
 Write-Host "[1/7] 加载配置..." -ForegroundColor Blue
 
-if (-not (Test-Path $EnvFile)) {
+if (-not (Test-Path $EnvFilePath)) {
     Write-Host "[X] .env 文件不存在!" -ForegroundColor Red
     throw ".env 文件不存在"
 }
 
 # 加载 .env (支持行内注释)
-Get-Content $EnvFile | ForEach-Object {
+Get-Content $EnvFilePath | ForEach-Object {
     if ($_ -match '^([^#=]+)=(.*)$') {
         $name = $Matches[1].Trim()
         $value = $Matches[2].Trim()
@@ -91,6 +90,24 @@ Get-Content $EnvFile | ForEach-Object {
     }
 }
 Write-Host "[OK] 已加载 .env" -ForegroundColor Green
+
+# 从环境变量读取 R2 配置
+$R2Bucket = $env:R2_BUCKET_NAME
+$DownloadBaseUrl = $env:DOWNLOAD_BASE_URL
+$CfZoneId = $env:CF_ZONE_ID
+$CfApiToken = $env:CF_API_TOKEN
+
+# 验证必要配置
+if (-not $R2Bucket) {
+    throw "R2_BUCKET_NAME 未配置，请在 .env 中设置"
+}
+if (-not $DownloadBaseUrl) {
+    throw "DOWNLOAD_BASE_URL 未配置，请在 .env 中设置"
+}
+
+Write-Host "  Bucket: $R2Bucket" -ForegroundColor Blue
+Write-Host "  Download URL: $DownloadBaseUrl" -ForegroundColor Blue
+Write-Host ""
 
 # 验证 R2 配置
 $R2AccessKeyId = $env:R2_ACCESS_KEY_ID
@@ -114,9 +131,8 @@ Write-Host ""
 Write-Host "[2/7] 检查 rclone..." -ForegroundColor Blue
 
 # 优先检查项目目录下的 rclone.exe
-$localRclone = Join-Path $ProjectDir "rclone.exe"
-if (Test-Path $localRclone) {
-    $rclonePath = $localRclone
+if (Test-Path $RclonePath) {
+    $rclonePath = $RclonePath
     Write-Host "[OK] 使用项目目录 rclone.exe" -ForegroundColor Green
 } else {
     # 检查系统 PATH
@@ -155,43 +171,46 @@ Write-Host ""
 Write-Host "[3/7] 物料完整性检查..." -ForegroundColor Blue
 Write-Host ""
 
-$TargetDir = Join-Path $BundleDir "x86_64-pc-windows-msvc\release\bundle\nsis"
+$TargetDir = $TargetNsisDir
 
 # 查找文件
 $NsisExe = Get-ChildItem -Path $TargetDir -Filter "*.exe" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch "portable" } | Select-Object -First 1
 $PortableZip = Get-ChildItem -Path $TargetDir -Filter "*portable*.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
-$UpdateZip = Get-ChildItem -Path $TargetDir -Filter "*.nsis.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
-$SigFile = Get-ChildItem -Path $TargetDir -Filter "*.nsis.zip.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
 
-Write-Host "  物料清单 - v$Version" -ForegroundColor Cyan
+# 签名文件：Tauri v2 直接对 NSIS 安装包签名，格式为 {exeName}.sig
+if ($NsisExe) {
+    $SigFileName = $NsisExe.Name + ".sig"
+    $SigFile = Get-ChildItem -Path $TargetDir -Filter $SigFileName -ErrorAction SilentlyContinue | Select-Object -First 1
+}
+else {
+    $SigFile = $null
+}
+
+# Tauri v2 NSIS 更新包 = NSIS 安装包本身 + .sig 签名文件
+# （不再生成独立的 .nsis.zip 文件）
+
+Write-Host "  物料清单 - v$($TauriConf.version)" -ForegroundColor Cyan
 Write-Host "  -----------------------------------------"
 
 if ($NsisExe) {
-    Write-Host "    [OK] NSIS:    $($NsisExe.Name)" -ForegroundColor Green
+    Write-Host "    [OK] NSIS 安装包: $($NsisExe.Name)" -ForegroundColor Green
 }
 else {
-    Write-Host "    [X] NSIS:    缺失" -ForegroundColor Red
+    Write-Host "    [X] NSIS 安装包: 缺失" -ForegroundColor Red
 }
 
 if ($PortableZip) {
-    Write-Host "    [OK] ZIP:     $($PortableZip.Name)" -ForegroundColor Green
+    Write-Host "    [OK] 便携版:     $($PortableZip.Name)" -ForegroundColor Green
 }
 else {
-    Write-Host "    [X] ZIP:     缺失" -ForegroundColor Yellow
-}
-
-if ($UpdateZip) {
-    Write-Host "    [OK] 更新包:  $($UpdateZip.Name)" -ForegroundColor Green
-}
-else {
-    Write-Host "    [X] 更新包:  缺失" -ForegroundColor Red
+    Write-Host "    [X] 便携版:     缺失" -ForegroundColor Yellow
 }
 
 if ($SigFile) {
-    Write-Host "    [OK] 签名:    $($SigFile.Name)" -ForegroundColor Green
+    Write-Host "    [OK] 更新签名:   $($SigFile.Name)" -ForegroundColor Green
 }
 else {
-    Write-Host "    [X] 签名:    缺失" -ForegroundColor Yellow
+    Write-Host "    [X] 更新签名:   缺失 (自动更新将不可用)" -ForegroundColor Red
 }
 
 Write-Host ""
@@ -203,8 +222,8 @@ if (-not $NsisExe) {
     throw "NSIS 安装包缺失"
 }
 
-if (-not $UpdateZip) {
-    Write-Host "[!] 更新包缺失，自动更新将不可用" -ForegroundColor Yellow
+if (-not $SigFile) {
+    Write-Host "[!] 更新签名缺失，自动更新将不可用" -ForegroundColor Yellow
     $continue = Read-Host "是否继续? (y/N)"
     if ($continue -ne "y" -and $continue -ne "Y") {
         Write-Host "发布已取消" -ForegroundColor Red
@@ -233,26 +252,21 @@ if ($SigFile) {
 }
 
 # 生成 windows-x86_64.json
-if ($UpdateZip) {
-    $UpdateFileName = $UpdateZip.Name
-    # 重命名上传文件名，添加版本和架构标识
-    $UpdateUploadName = "nova-agents_${Version}_x86_64.nsis.zip"
-
+# Tauri v2: NSIS 安装包即为更新包，签名文件为 {exeName}.sig
+if ($NsisExe) {
     $manifest = @{
-        version   = $Version
-        notes     = "nova-agents v$Version"
+        version   = $TauriConf.version
+        notes     = "nova-agents v$($TauriConf.version)"
         pub_date  = $PubDate
         signature = $Signature
-        url       = "$DownloadBaseUrl/releases/v$Version/$UpdateUploadName"
+        url       = "$DownloadBaseUrl/releases/v$($TauriConf.version)/$($NsisExe.Name)"
     }
 
     # 添加下载链接
     $downloads = @{}
-    if ($NsisExe) {
-        $downloads["installer"] = "$DownloadBaseUrl/releases/v$Version/$($NsisExe.Name)"
-    }
+    $downloads["installer"] = "$DownloadBaseUrl/releases/v$($TauriConf.version)/$($NsisExe.Name)"
     if ($PortableZip) {
-        $downloads["portable"] = "$DownloadBaseUrl/releases/v$Version/$($PortableZip.Name)"
+        $downloads["portable"] = "$DownloadBaseUrl/releases/v$($TauriConf.version)/$($PortableZip.Name)"
     }
     if ($downloads.Count -gt 0) {
         $manifest["downloads"] = $downloads
@@ -268,9 +282,6 @@ if ($UpdateZip) {
         Write-Host "  [!] 警告: 签名为空，自动更新将验证失败" -ForegroundColor Yellow
     }
 }
-else {
-    Write-Host "  [!] 跳过更新清单生成 (无更新包)" -ForegroundColor Yellow
-}
 
 # 生成 latest_win.json (网站下载页 API)
 # 注意：只发布 NSIS 安装包，便携版暂不对外发布
@@ -278,14 +289,14 @@ if ($NsisExe) {
     $latestWinDownloads = @{
         "win_x64" = @{
             name = "Windows x64"
-            url  = "$DownloadBaseUrl/releases/v$Version/$($NsisExe.Name)"
+            url  = "$DownloadBaseUrl/releases/v$($TauriConf.version)/$($NsisExe.Name)"
         }
     }
 
     $latestWinManifest = @{
-        version       = $Version
+        version       = $TauriConf.version
         pub_date      = $PubDate
-        release_notes = "nova-agents v$Version"
+        release_notes = "nova-agents v$($TauriConf.version)"
         downloads     = $latestWinDownloads
     }
 
@@ -316,13 +327,9 @@ if ($PortableZip) {
     Write-Host "    - $($PortableZip.Name) ($size)"
     $uploadFiles += $PortableZip
 }
-if ($UpdateZip) {
-    $size = "{0:N2} MB" -f ($UpdateZip.Length / 1MB)
-    Write-Host "    - $UpdateUploadName ($size)"
-    $uploadFiles += $UpdateZip
-}
 if ($SigFile) {
-    Write-Host "    - nova-agents_${Version}_x86_64.nsis.zip.sig"
+    $sigSize = "{0:N2} KB" -f ($SigFile.Length / 1KB)
+    Write-Host "    - $($SigFile.Name) ($sigSize) [更新签名]"
     $uploadFiles += $SigFile
 }
 
@@ -332,7 +339,7 @@ Write-Host "    - windows-x86_64.json (Tauri Updater)"
 Write-Host "    - latest_win.json (网站下载 API)"
 Write-Host ""
 Write-Host "  目标位置:" -ForegroundColor Cyan
-Write-Host "    - 文件: $DownloadBaseUrl/releases/v$Version/"
+Write-Host "    - 文件: $DownloadBaseUrl/releases/v$($TauriConf.version)/"
 Write-Host "    - 清单: $DownloadBaseUrl/update/"
 Write-Host ""
 
@@ -361,7 +368,7 @@ $uploadFailed = 0
 # 上传 NSIS 安装包
 if ($NsisExe) {
     Write-Host "  上传 NSIS 安装包..." -ForegroundColor Cyan
-    & $rclonePath --config=$rcloneConfig copy $NsisExe.FullName "r2:$R2Bucket/releases/v$Version/" --s3-no-check-bucket --progress
+    & $rclonePath --config=$rcloneConfig copy $NsisExe.FullName "r2:$R2Bucket/releases/v$($TauriConf.version)/" --s3-no-check-bucket --progress
     if ($LASTEXITCODE -eq 0) {
         Write-Host "    [OK] $($NsisExe.Name)" -ForegroundColor Green
         $uploadSuccess++
@@ -375,7 +382,7 @@ if ($NsisExe) {
 # 上传便携版 ZIP
 if ($PortableZip) {
     Write-Host "  上传便携版 ZIP..." -ForegroundColor Cyan
-    & $rclonePath --config=$rcloneConfig copy $PortableZip.FullName "r2:$R2Bucket/releases/v$Version/" --s3-no-check-bucket --progress
+    & $rclonePath --config=$rcloneConfig copy $PortableZip.FullName "r2:$R2Bucket/releases/v$($TauriConf.version)/" --s3-no-check-bucket --progress
     if ($LASTEXITCODE -eq 0) {
         Write-Host "    [OK] $($PortableZip.Name)" -ForegroundColor Green
         $uploadSuccess++
@@ -386,27 +393,12 @@ if ($PortableZip) {
     }
 }
 
-# 上传更新包 (使用新文件名)
-if ($UpdateZip) {
-    Write-Host "  上传更新包..." -ForegroundColor Cyan
-    & $rclonePath --config=$rcloneConfig copyto $UpdateZip.FullName "r2:$R2Bucket/releases/v$Version/$UpdateUploadName" --s3-no-check-bucket --progress
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "    [OK] $UpdateUploadName" -ForegroundColor Green
-        $uploadSuccess++
-    }
-    else {
-        Write-Host "    [X] 更新包上传失败" -ForegroundColor Red
-        $uploadFailed++
-    }
-}
-
-# 上传签名文件
+# 上传签名文件 (Tauri v2: {exeName}.sig，与安装包同名)
 if ($SigFile) {
-    Write-Host "  上传签名文件..." -ForegroundColor Cyan
-    $sigUploadName = "nova-agents_${Version}_x86_64.nsis.zip.sig"
-    & $rclonePath --config=$rcloneConfig copyto $SigFile.FullName "r2:$R2Bucket/releases/v$Version/$sigUploadName" --s3-no-check-bucket --progress
+    Write-Host "  上传更新签名..." -ForegroundColor Cyan
+    & $rclonePath --config=$rcloneConfig copy $SigFile.FullName "r2:$R2Bucket/releases/v$($TauriConf.version)/" --s3-no-check-bucket --progress
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "    [OK] $sigUploadName" -ForegroundColor Green
+        Write-Host "    [OK] $($SigFile.Name)" -ForegroundColor Green
         $uploadSuccess++
     }
     else {
@@ -442,9 +434,6 @@ Write-Host ""
 # ========================================
 # 清除 CDN 缓存
 # ========================================
-$CfZoneId = $env:CF_ZONE_ID
-$CfApiToken = $env:CF_API_TOKEN
-
 if ($CfZoneId -and $CfApiToken) {
     Write-Host "清除 Cloudflare CDN 缓存..." -ForegroundColor Cyan
 
@@ -454,13 +443,13 @@ if ($CfZoneId -and $CfApiToken) {
     )
 
     if ($NsisExe) {
-        $purgeUrls += "$DownloadBaseUrl/releases/v$Version/$($NsisExe.Name)"
+        $purgeUrls += "$DownloadBaseUrl/releases/v$($TauriConf.version)/$($NsisExe.Name)"
     }
     if ($PortableZip) {
-        $purgeUrls += "$DownloadBaseUrl/releases/v$Version/$($PortableZip.Name)"
+        $purgeUrls += "$DownloadBaseUrl/releases/v$($TauriConf.version)/$($PortableZip.Name)"
     }
-    if ($UpdateZip) {
-        $purgeUrls += "$DownloadBaseUrl/releases/v$Version/$UpdateUploadName"
+    if ($SigFile) {
+        $purgeUrls += "$DownloadBaseUrl/releases/v$($TauriConf.version)/$($SigFile.Name)"
     }
 
     $purgeBody = @{ files = $purgeUrls } | ConvertTo-Json
@@ -494,9 +483,10 @@ Write-Host ""
 # ========================================
 Write-Host "上传到 GitHub Release..." -ForegroundColor Cyan
 
-$ghScript = Join-Path $ProjectDir "scripts\publish\upload_github_release_win.ps1"
+
+
 try {
-    & $ghScript
+    & $UploadGhScriptPath
     Write-Host "  [OK] GitHub Release 上传完成" -ForegroundColor Green
 } catch {
     Write-Host "  [!] GitHub Release 上传失败: $_" -ForegroundColor Yellow
@@ -523,16 +513,16 @@ Write-Host "=========================================" -ForegroundColor Green
 Write-Host "  发布完成!" -ForegroundColor Green
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  版本: v$Version" -ForegroundColor Cyan
+Write-Host "  版本: v$($TauriConf.version)" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  下载地址 (NSIS):" -ForegroundColor Blue
 if ($NsisExe) {
-    Write-Host "    $DownloadBaseUrl/releases/v$Version/$($NsisExe.Name)" -ForegroundColor Cyan
+    Write-Host "    $DownloadBaseUrl/releases/v$($TauriConf.version)/$($NsisExe.Name)" -ForegroundColor Cyan
 }
 Write-Host ""
 Write-Host "  下载地址 (便携版):" -ForegroundColor Blue
 if ($PortableZip) {
-    Write-Host "    $DownloadBaseUrl/releases/v$Version/$($PortableZip.Name)" -ForegroundColor Cyan
+    Write-Host "    $DownloadBaseUrl/releases/v$($TauriConf.version)/$($PortableZip.Name)" -ForegroundColor Cyan
 }
 Write-Host ""
 Write-Host "  自动更新清单 (Tauri Updater):" -ForegroundColor Blue

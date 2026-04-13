@@ -5,11 +5,12 @@
 
 $ErrorActionPreference = "Stop"
 
-$ProjectDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+# 引入统一路径变量
+. "$PSScriptRoot\..\paths_windows.ps1"
 Set-Location $ProjectDir
 
 # 读取版本号
-$TauriConf = Get-Content "src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json
+$TauriConf = Get-Content $TauriConfPath -Raw | ConvertFrom-Json
 $Version = $TauriConf.version
 
 Write-Host ""
@@ -28,8 +29,7 @@ if (-not $ghCmd) {
 }
 
 # 查找 NSIS .exe 文件
-$TargetDir = Join-Path $ProjectDir "src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis"
-$NsisExe = Get-ChildItem -Path $TargetDir -Filter "*.exe" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch "portable" } | Select-Object -First 1
+$NsisExe = Get-ChildItem -Path $TargetNsisDir -Filter "*.exe" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch "portable" } | Select-Object -First 1
 
 if (-not $NsisExe) {
     Write-Host "[X] 未找到 NSIS 安装包" -ForegroundColor Red

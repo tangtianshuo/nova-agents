@@ -49,13 +49,15 @@ function Format-FileSize {
 
 try {
 
-$ProjectDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+# 引入统一路径变量
+. "$PSScriptRoot\..\paths_windows.ps1"
+
+# 切换到项目根目录
 Set-Location $ProjectDir
 
 # 配置
 $R2Bucket = "nova-agents-releases"
 $DownloadBaseUrl = "https://download.nova-agents.io"
-$EnvFile = Join-Path $ProjectDir ".env"
 
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Cyan
@@ -68,12 +70,12 @@ Write-Host ""
 # ========================================
 Write-Host "[1/7] 加载配置..." -ForegroundColor Blue
 
-if (-not (Test-Path $EnvFile)) {
+if (-not (Test-Path $EnvFilePath)) {
     Write-Host "[X] .env 文件不存在!" -ForegroundColor Red
     throw ".env 文件不存在"
 }
 
-Get-Content $EnvFile | ForEach-Object {
+Get-Content $EnvFilePath | ForEach-Object {
     if ($_ -match '^([^#=]+)=(.*)$') {
         $name = $Matches[1].Trim()
         $value = $Matches[2].Trim()
@@ -104,9 +106,8 @@ Write-Host ""
 # ========================================
 Write-Host "[2/7] 检查 rclone..." -ForegroundColor Blue
 
-$localRclone = Join-Path $ProjectDir "rclone.exe"
-if (Test-Path $localRclone) {
-    $rclonePath = $localRclone
+if (Test-Path $RclonePath) {
+    $rclonePath = $RclonePath
     Write-Host "[OK] 使用项目目录 rclone.exe" -ForegroundColor Green
 } else {
     $rclone = Get-Command rclone -ErrorAction SilentlyContinue

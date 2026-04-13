@@ -11,15 +11,17 @@ param(
 $ErrorActionPreference = "Stop"
 $BuildSuccess = $false
 
+# 引入统一路径变量
+. "$PSScriptRoot\..\paths_windows.ps1"
+
+# 切换到项目根目录（bun build 等命令使用相对路径）
+Set-Location $ProjectDir
+
 try {
-    # 定位到项目根目录 (脚本位于 scripts/build/build_windows.ps1，需要上两层)
-    $ProjectDir = (Resolve-Path ..\..).Path
 
     # 读取版本号
-    $TauriConfPath = Join-Path $ProjectDir "src-tauri\tauri.conf.json"
     $TauriConf = Get-Content $TauriConfPath -Raw | ConvertFrom-Json
     $Version = $TauriConf.version
-    $EnvFile = Join-Path $ProjectDir ".env"
 
     Write-Host ""
     Write-Host "=========================================" -ForegroundColor Cyan
@@ -31,10 +33,10 @@ try {
     # ========================================
     # 版本同步检查
     # ========================================
-    $PkgJson = Get-Content (Join-Path $ProjectDir "package.json") -Raw | ConvertFrom-Json
+    $PkgJson = Get-Content $PackageJsonPath -Raw | ConvertFrom-Json
     $PkgVersion = $PkgJson.version
 
-    $CargoToml = Get-Content (Join-Path $ProjectDir "src-tauri\Cargo.toml") -Raw
+    $CargoToml = Get-Content $CargoTomlPath -Raw
     $CargoVersionMatch = [regex]::Match($CargoToml, 'version = "([^"]+)"')
     $CargoVersion = if ($CargoVersionMatch.Success) { $CargoVersionMatch.Groups[1].Value } else { "" }
 
@@ -57,9 +59,9 @@ try {
     # ========================================
     Write-Host "[1/7] 加载环境配置..." -ForegroundColor Blue
 
-    if (Test-Path $EnvFile) {
+    if (Test-Path $EnvFilePath) {
         # 加载 .env (支持行内注释)
-        Get-Content $EnvFile | ForEach-Object {
+        Get-Content $EnvFilePath | ForEach-Object {
             if ($_ -match '^([^#=]+)=(.*)$') {
                 $name = $Matches[1].Trim()
                 $value = $Matches[2].Trim()
@@ -163,9 +165,8 @@ try {
     }
 
     # 检查构建必需文件
-    $bunBinaryPath = "src-tauri\binaries\bun-x86_64-pc-windows-msvc.exe"
     Write-Host "  检查 bundled bun... " -NoNewline
-    if (Test-Path $bunBinaryPath) {
+    if (Test-Path $BunBinaryPath) {
         Write-Host "OK" -ForegroundColor Green
     } else {
         Write-Host "MISSING" -ForegroundColor Red
@@ -173,14 +174,12 @@ try {
         $depOk = $false
     }
 
-    $nodejsPath = "src-tauri\resources\nodejs\node.exe"
-    $NodeDir = "src-tauri\resources\nodejs"
     Write-Host "  检查 bundled Node.js... " -NoNewline
-    if (Test-Path $nodejsPath) {
+    if (Test-Path $NodejsExePath) {
         Write-Host "OK (exists)" -ForegroundColor Green
         # Node.js 已存在，但仍需确保 npm 已升级（首次下载后未升级的遗留情况）
-        $npmDir = Join-Path $NodeDir "node_modules\npm"
-        $nodeExe = Join-Path $NodeDir "node.exe"
+        $npmDir = Join-Path $NodejsDir "node_modules\npm"
+        $nodeExe = $NodejsExePath
         if (Test-Path $npmDir) {
             $npmCli = Join-Path $npmDir "bin\npm-cli.js"
             $curVer = & $nodeExe $npmCli --version 2>&1
@@ -215,7 +214,6 @@ try {
         # Auto-download Node.js if setup_windows.ps1 was not run
         try {
             $NodeVersion = "24.14.0"
-            $NodeDir = "src-tauri\resources\nodejs"
             $ZipName = "node-v$NodeVersion-win-x64.zip"
             $TempZip = Join-Path $env:TEMP "node-windows.zip"
             $TempDir = Join-Path $env:TEMP "node-windows-extract"
@@ -224,18 +222,18 @@ try {
             if (Test-Path $TempDir) { Remove-Item -Recurse -Force $TempDir }
             Expand-Archive -Path $TempZip -DestinationPath $TempDir -Force
             $ExtractedDir = Join-Path $TempDir "node-v$NodeVersion-win-x64"
-            if (Test-Path $NodeDir) { Remove-Item -Recurse -Force $NodeDir }
-            New-Item -ItemType Directory -Path $NodeDir -Force | Out-Null
+            if (Test-Path $NodejsDir) { Remove-Item -Recurse -Force $NodejsDir }
+            New-Item -ItemType Directory -Path $NodejsDir -Force | Out-Null
             # Copy top-level files
-            Copy-Item (Join-Path $ExtractedDir "node.exe") $NodeDir -Force
-            Copy-Item (Join-Path $ExtractedDir "npm.cmd") $NodeDir -Force
-            Copy-Item (Join-Path $ExtractedDir "npx.cmd") $NodeDir -Force
-            Copy-Item (Join-Path $ExtractedDir "npm") $NodeDir -Force
-            Copy-Item (Join-Path $ExtractedDir "npx") $NodeDir -Force
+            Copy-Item (Join-Path $ExtractedDir "node.exe") $NodejsDir -Force
+            Copy-Item (Join-Path $ExtractedDir "npm.cmd") $NodejsDir -Force
+            Copy-Item (Join-Path $ExtractedDir "npx.cmd") $NodejsDir -Force
+            Copy-Item (Join-Path $ExtractedDir "npm") $NodejsDir -Force
+            Copy-Item (Join-Path $ExtractedDir "npx") $NodejsDir -Force
             # Use robocopy for node_modules — Copy-Item -Recurse silently skips
             # files beyond MAX_PATH (260 chars), corrupting npm's minizlib/minipass
             $SrcMod = Join-Path $ExtractedDir "node_modules"
-            $DstMod = Join-Path $NodeDir "node_modules"
+            $DstMod = Join-Path $NodejsDir "node_modules"
             if (Test-Path $SrcMod) {
                 & robocopy $SrcMod $DstMod /E /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
                 if ($LASTEXITCODE -ge 8) { throw "robocopy failed: exit $LASTEXITCODE" }
@@ -245,11 +243,11 @@ try {
             # Upgrade npm — bundled npm 11.9.0 has minizlib CJS bug on Windows.
             # CANNOT use `npm install npm@latest` (catch-22: broken npm can't upgrade itself).
             # Download npm tarball directly with Invoke-WebRequest + tar (Win10+ built-in).
-            $npmDir = Join-Path $NodeDir "node_modules\npm"
+            $npmDir = Join-Path $NodejsDir "node_modules\npm"
             if (Test-Path $npmDir) {
                 Write-Host "    升级 npm (curl + tar)..." -NoNewline
                 try {
-                    $nodeExe = Join-Path $NodeDir "node.exe"
+                    $nodeExe = $NodejsExePath
                     $oldNpmCli = Join-Path $npmDir "bin\npm-cli.js"
                     $oldVer = if (Test-Path $oldNpmCli) { & $nodeExe $oldNpmCli --version 2>&1 } else { "unknown" }
                     Write-Host " 当前 v$oldVer" -NoNewline
@@ -286,7 +284,7 @@ try {
         }
     }
 
-    $gitInstallerPath = "src-tauri\nsis\Git-Installer.exe"
+    $gitInstallerPath = $GitInstallerPath
     Write-Host "  检查 Git installer... " -NoNewline
     if (Test-Path $gitInstallerPath) {
         Write-Host "OK" -ForegroundColor Green
@@ -297,7 +295,7 @@ try {
     }
 
     # VC++ Runtime DLL (app-local deployment for bun.exe)
-    $resDir = "src-tauri\resources"
+    $resDir = $ResourcesDir
     $vcDlls = @("vcruntime140.dll", "vcruntime140_1.dll")
     Write-Host "  检查 VC++ Runtime DLL... " -NoNewline
     $allPresent = $true
@@ -498,9 +496,8 @@ try {
 
     # 打包服务端代码
     Write-Host "  打包服务端代码..." -ForegroundColor Cyan
-    $resourcesDir = Join-Path $ProjectDir "src-tauri\resources"
-    if (-not (Test-Path $resourcesDir)) {
-        New-Item -ItemType Directory -Path $resourcesDir -Force | Out-Null
+    if (-not (Test-Path $ResourcesDir)) {
+        New-Item -ItemType Directory -Path $ResourcesDir -Force | Out-Null
     }
 
     & bun build ./src/server/index.ts --outfile=./src-tauri/resources/server-dist.js --target=bun
@@ -525,56 +522,51 @@ try {
 
     # 复制 SDK 依赖
     Write-Host "  复制 SDK 依赖..." -ForegroundColor Cyan
-    $sdkSrc = Join-Path $ProjectDir "node_modules\@anthropic-ai\claude-agent-sdk"
-    $sdkDest = Join-Path $ProjectDir "src-tauri\resources\claude-agent-sdk"
-
-    if (-not (Test-Path $sdkSrc)) {
-        throw "SDK 目录不存在: $sdkSrc"
+    if (-not (Test-Path $SdkSrcDir)) {
+        throw "SDK 目录不存在: $SdkSrcDir"
     }
 
-    if (Test-Path $sdkDest) {
-        Remove-Item -Recurse -Force $sdkDest
+    if (Test-Path $ClaudeSdkDir) {
+        Remove-Item -Recurse -Force $ClaudeSdkDir
     }
-    New-Item -ItemType Directory -Path $sdkDest -Force | Out-Null
+    New-Item -ItemType Directory -Path $ClaudeSdkDir -Force | Out-Null
 
-    Copy-Item "$sdkSrc\cli.js" $sdkDest -Force
-    Copy-Item "$sdkSrc\sdk.mjs" $sdkDest -Force
-    Copy-Item "$sdkSrc\*.wasm" $sdkDest -Force
-    Copy-Item "$sdkSrc\vendor" $sdkDest -Recurse -Force
+    Copy-Item "$SdkSrcDir\cli.js" $ClaudeSdkDir -Force
+    Copy-Item "$SdkSrcDir\sdk.mjs" $ClaudeSdkDir -Force
+    Copy-Item "$SdkSrcDir\*.wasm" $ClaudeSdkDir -Force
+    Copy-Item "$SdkSrcDir\vendor" $ClaudeSdkDir -Recurse -Force
     Write-Host "    OK - SDK 依赖复制完成" -ForegroundColor Green
 
     # 预装 agent-browser CLI（使用预生成的 lockfile 避免耗时的依赖解析）
     Write-Host "  预装 agent-browser CLI..." -ForegroundColor Cyan
-    $agentBrowserDir = Join-Path $ProjectDir "src-tauri\resources\agent-browser-cli"
-    $lockfileDir = Join-Path $ProjectDir "src\server\agent-browser-lockfile"
     # 版本一致性校验：index.ts 的 AGENT_BROWSER_VERSION 必须与 lockfile 的 package.json 一致
-    $indexTs = Get-Content (Join-Path $ProjectDir "src\server\index.ts") -Raw
-    if ($indexTs -match "const AGENT_BROWSER_VERSION = '([^']+)'") {
+    $indexTsContent = Get-Content $ServerIndexTs -Raw
+    if ($indexTsContent -match "const AGENT_BROWSER_VERSION = '([^']+)'") {
         $codeVersion = $Matches[1]
     } else {
         throw "无法从 index.ts 读取 AGENT_BROWSER_VERSION"
     }
-    $lockPkg = Get-Content (Join-Path $lockfileDir "package.json") -Raw | ConvertFrom-Json
+    $lockPkg = Get-Content (Join-Path $AgentBrowserLockDir "package.json") -Raw | ConvertFrom-Json
     $lockVersion = $lockPkg.dependencies.'agent-browser'
     if ($codeVersion -ne $lockVersion) {
         throw "版本不一致! index.ts: $codeVersion, lockfile: $lockVersion — 请同步更新 src/server/agent-browser-lockfile/"
     }
     Write-Host "  版本: $codeVersion" -ForegroundColor Cyan
-    if (Test-Path $agentBrowserDir) {
-        Remove-Item -Recurse -Force $agentBrowserDir
+    if (Test-Path $AgentBrowserCliDir) {
+        Remove-Item -Recurse -Force $AgentBrowserCliDir
     }
-    New-Item -ItemType Directory -Path $agentBrowserDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $AgentBrowserCliDir -Force | Out-Null
     # 复制预生成的 package.json + bun.lock（跳过依赖解析，秒级安装）
-    Copy-Item (Join-Path $lockfileDir "package.json") $agentBrowserDir -Force
-    Copy-Item (Join-Path $lockfileDir "bun.lock") $agentBrowserDir -Force
-    Push-Location $agentBrowserDir
+    Copy-Item (Join-Path $AgentBrowserLockDir "package.json") $AgentBrowserCliDir -Force
+    Copy-Item (Join-Path $AgentBrowserLockDir "bun.lock") $AgentBrowserCliDir -Force
+    Push-Location $AgentBrowserCliDir
     & bun install --frozen-lockfile --ignore-scripts
     Pop-Location
     if ($LASTEXITCODE -ne 0) {
         throw "agent-browser 预装失败"
     }
     # npm 包内含全平台 native binary，仅保留 win32 的（删除 darwin/linux）
-    $abBinDir = Join-Path $agentBrowserDir "node_modules\agent-browser\bin"
+    $abBinDir = Join-Path $AgentBrowserCliDir "node_modules\agent-browser\bin"
     Get-ChildItem -Path $abBinDir -Filter "agent-browser-darwin-*" -ErrorAction SilentlyContinue | Remove-Item -Force
     Get-ChildItem -Path $abBinDir -Filter "agent-browser-linux-*" -ErrorAction SilentlyContinue | Remove-Item -Force
     # 验证非 win32 二进制已全部删除
@@ -658,14 +650,12 @@ try {
     if (-not $SkipPortable) {
         Write-Host "[6.5/7] 创建便携版 ZIP..." -ForegroundColor Blue
 
-        $targetDir = "src-tauri\target\x86_64-pc-windows-msvc\release"
-        $nsisDir = "$targetDir\bundle\nsis"
-        $exePath = "$targetDir\nova-agents.exe"
+        $exePath = "$TargetRelease\nova-agents.exe"
 
         if (Test-Path $exePath) {
-            $portableDir = Join-Path $targetDir "portable"
+            $portableDir = Join-Path $TargetRelease "portable"
             $zipName = "nova-agents_${Version}_x86_64-portable.zip"
-            $zipPath = Join-Path $nsisDir $zipName
+            $zipPath = Join-Path $TargetNsisDir $zipName
 
             if (Test-Path $portableDir) {
                 Remove-Item -Recurse -Force $portableDir
@@ -674,7 +664,7 @@ try {
 
             Copy-Item $exePath $portableDir -Force
 
-            $bunExe = Join-Path $targetDir "bun-x86_64-pc-windows-msvc.exe"
+            $bunExe = Join-Path $TargetRelease "bun-x86_64-pc-windows-msvc.exe"
             if (Test-Path $bunExe) {
                 Copy-Item $bunExe $portableDir -Force
                 # Create bun.exe alias for SDK subprocess compatibility
@@ -691,7 +681,7 @@ try {
                 }
             }
 
-            $resourcesSource = Join-Path $targetDir "resources"
+            $resourcesSource = Join-Path $TargetRelease "resources"
             if (Test-Path $resourcesSource) {
                 Copy-Item $resourcesSource $portableDir -Recurse -Force
             }
@@ -725,8 +715,6 @@ try {
     # ========================================
     # 显示构建产物
     # ========================================
-    $bundleDir = "src-tauri\target\x86_64-pc-windows-msvc\release\bundle"
-    $nsisDir = Join-Path $bundleDir "nsis"
 
     Write-Host "=========================================" -ForegroundColor Green
     Write-Host "  构建成功!" -ForegroundColor Green
@@ -736,19 +724,19 @@ try {
     Write-Host ""
     Write-Host "  构建产物:" -ForegroundColor Blue
 
-    $nsisFiles = Get-ChildItem -Path $nsisDir -Filter "*.exe" -ErrorAction SilentlyContinue
+    $nsisFiles = Get-ChildItem -Path $TargetNsisDir -Filter "*.exe" -ErrorAction SilentlyContinue
     foreach ($file in $nsisFiles) {
         $size = "{0:N2} MB" -f ($file.Length / 1MB)
         Write-Host "    NSIS: $($file.Name) ($size)" -ForegroundColor Cyan
     }
 
-    $zipFiles = Get-ChildItem -Path $nsisDir -Filter "*portable*.zip" -ErrorAction SilentlyContinue
+    $zipFiles = Get-ChildItem -Path $TargetNsisDir -Filter "*portable*.zip" -ErrorAction SilentlyContinue
     foreach ($file in $zipFiles) {
         $size = "{0:N2} MB" -f ($file.Length / 1MB)
         Write-Host "    ZIP:  $($file.Name) ($size)" -ForegroundColor Cyan
     }
 
-    $tarFiles = Get-ChildItem -Path $nsisDir -Filter "*.nsis.zip" -ErrorAction SilentlyContinue
+    $tarFiles = Get-ChildItem -Path $TargetNsisDir -Filter "*.nsis.zip" -ErrorAction SilentlyContinue
     foreach ($file in $tarFiles) {
         $size = "{0:N2} MB" -f ($file.Length / 1MB)
         Write-Host "    更新包: $($file.Name) ($size)" -ForegroundColor Cyan
@@ -756,10 +744,10 @@ try {
 
     Write-Host ""
     Write-Host "  输出目录:" -ForegroundColor Blue
-    Write-Host "    $nsisDir" -ForegroundColor Cyan
+    Write-Host "    $TargetNsisDir" -ForegroundColor Cyan
     Write-Host ""
 
-    $sigFiles = Get-ChildItem -Path $nsisDir -Filter "*.sig" -ErrorAction SilentlyContinue
+    $sigFiles = Get-ChildItem -Path $TargetNsisDir -Filter "*.sig" -ErrorAction SilentlyContinue
     if ($sigFiles) {
         Write-Host "  OK - 自动更新签名已生成" -ForegroundColor Green
     }
@@ -789,7 +777,6 @@ try {
     Write-Host ""
 
     # 尝试恢复配置
-    $TauriConfPath = Join-Path $ProjectDir "src-tauri\tauri.conf.json"
     if (Test-Path "$TauriConfPath.bak") {
         Move-Item "$TauriConfPath.bak" $TauriConfPath -Force
         Write-Host "已恢复 tauri.conf.json" -ForegroundColor Yellow

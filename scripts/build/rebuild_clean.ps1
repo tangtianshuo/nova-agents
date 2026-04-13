@@ -7,21 +7,24 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# 引入统一路径变量
+. "$PSScriptRoot\..\paths_windows.ps1"
+
+# 切换到项目根目录
+Set-Location $ProjectDir
+
 Write-Host ""
 Write-Host "╔═══════════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║  🔧 nova-agents 彻底清理重建                              ║" -ForegroundColor Cyan
 Write-Host "╚═══════════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
-$ProjectDir = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-Set-Location $ProjectDir
-
 # ========================================
 # Step 1: 验证 CSP 配置
 # ========================================
 Write-Host "[1/6] 验证源代码 CSP 配置..." -ForegroundColor Blue
 
-$tauriConf = Get-Content "src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json
+$tauriConf = Get-Content $TauriConfPath -Raw | ConvertFrom-Json
 $csp = $tauriConf.app.security.csp
 
 Write-Host "  当前 CSP 配置:" -ForegroundColor Gray
@@ -167,7 +170,7 @@ Write-Host ""
 Write-Host "[6/6] 开始构建..." -ForegroundColor Blue
 Write-Host ""
 
-& (Join-Path $ProjectDir "scripts\build\build_windows.ps1")
+& $BuildScriptPath
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""

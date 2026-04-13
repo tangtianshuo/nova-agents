@@ -75,5 +75,5 @@ specs/research/
 start_dev.sh
 
 # Default workspace (cloned by setup.sh)
-/mino/
+/nova/
 ~

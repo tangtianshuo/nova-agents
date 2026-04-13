@@ -129,15 +129,15 @@ cd ..
 echo -e "${GREEN}✓ Rust 依赖准备完成${NC}"
 echo ""
 
-# 准备默认工作区 (mino) — 每次拉取最新版本
+# 准备默认工作区 (nova) — 每次拉取最新版本
 # .git 不保留：避免 Tauri 资源打包权限问题 + rerun-if-changed 性能问题
-echo -e "${BLUE}[6/7] 准备默认工作区 (mino)${NC}"
-MINO_DIR="${PROJECT_DIR}/mino"
-rm -rf "$MINO_DIR"
+echo -e "${BLUE}[6/7] 准备默认工作区 (nova)${NC}"
+NOVA_DIR="${PROJECT_DIR}/nova"
+rm -rf "$NOVA_DIR"
 echo -e "  ${CYAN}克隆 openmino 默认工作区 (最新版本)...${NC}"
-git clone git@github.com:hAcKlyc/openmino.git "$MINO_DIR"
-rm -rf "$MINO_DIR/.git"
-echo -e "${GREEN}✓ mino 默认工作区已就绪${NC}"
+git clone git@github.com:hAcKlyc/openmino.git "$NOVA_DIR"
+rm -rf "$NOVA_DIR/.git"
+echo -e "${GREEN}✓ nova 默认工作区已就绪${NC}"
 echo ""
 
 # 完成

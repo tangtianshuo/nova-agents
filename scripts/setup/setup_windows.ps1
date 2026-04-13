@@ -7,10 +7,13 @@
 
 $ErrorActionPreference = "Stop"
 
-try {
-    $ProjectDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-    Set-Location $ProjectDir
+# 引入统一路径变量
+. "$PSScriptRoot\..\paths_windows.ps1"
 
+# 切换到项目根目录
+Set-Location $ProjectDir
+
+try {
     $BunVersion = "1.3.6"
 
     Write-Host "`n=========================================" -ForegroundColor Blue
@@ -47,14 +50,9 @@ try {
     }
 
     function Get-BunBinary {
-        $BinariesDir = Join-Path $ProjectDir "src-tauri\binaries"
-        if (-not (Test-Path $BinariesDir)) {
-            New-Item -ItemType Directory -Path $BinariesDir -Force | Out-Null
-        }
-
         Write-Host "下载 Bun 运行时 (v$BunVersion)..." -ForegroundColor Blue
 
-        $WinFile = Join-Path $BinariesDir "bun-x86_64-pc-windows-msvc.exe"
+        $WinFile = $BunBinaryPath
         # Always re-download: the output filename doesn't encode build variant (baseline vs AVX2),
         # so we can't tell if an existing file is the correct baseline build.
         if (Test-Path $WinFile) {
@@ -99,14 +97,9 @@ try {
         $GitVersion = "2.52.0"
         $GitUrl = "https://github.com/git-for-windows/git/releases/download/v$GitVersion.windows.1/Git-$GitVersion-64-bit.exe"
 
-        $NsisDir = Join-Path $ProjectDir "src-tauri\nsis"
-        if (-not (Test-Path $NsisDir)) {
-            New-Item -ItemType Directory -Path $NsisDir -Force | Out-Null
-        }
-
-        $GitFile = Join-Path $NsisDir "Git-Installer.exe"
-
         Write-Host "下载 Git for Windows (v$GitVersion)..." -ForegroundColor Blue
+
+        $GitFile = $GitInstallerPath
 
         if (-not (Test-Path $GitFile)) {
             Write-Host "  下载 Git 安装包..." -ForegroundColor Cyan
@@ -128,21 +121,20 @@ try {
 
     function Get-NodeJSBinary {
         $NodeVersion = "24.14.0"
-        $NodeDir = Join-Path $ProjectDir "src-tauri\resources\nodejs"
-        if (-not (Test-Path $NodeDir)) {
-            New-Item -ItemType Directory -Path $NodeDir -Force | Out-Null
+        if (-not (Test-Path $NodejsDir)) {
+            New-Item -ItemType Directory -Path $NodejsDir -Force | Out-Null
         }
 
         Write-Host "下载 Node.js 运行时 (v$NodeVersion)..." -ForegroundColor Blue
 
-        $NodeExe = Join-Path $NodeDir "node.exe"
+        $NodeExe = $NodejsExePath
         if (Test-Path $NodeExe) {
             # Check version
             $existingVer = & $NodeExe --version 2>$null
             if ($existingVer -eq "v$NodeVersion") {
                 Write-Host "  OK - Node.js v$NodeVersion (already exists)" -ForegroundColor Green
                 # Node.js 已存在，但仍需确保 npm 已升级
-                $npmDir = Join-Path $NodeDir "node_modules\npm"
+                $npmDir = Join-Path $NodejsDir "node_modules\npm"
                 if (Test-Path $npmDir) {
                     $npmCli = Join-Path $npmDir "bin\npm-cli.js"
                     $curVer = & $NodeExe $npmCli --version 2>&1
@@ -193,20 +185,20 @@ try {
             $ExtractedDir = Join-Path $TempDir "node-v$NodeVersion-win-x64"
 
             # Clean and copy full distribution (node.exe + npm + npx)
-            if (Test-Path $NodeDir) { Remove-Item -Recurse -Force $NodeDir }
-            New-Item -ItemType Directory -Path $NodeDir -Force | Out-Null
+            if (Test-Path $NodejsDir) { Remove-Item -Recurse -Force $NodejsDir }
+            New-Item -ItemType Directory -Path $NodejsDir -Force | Out-Null
 
             # Copy top-level files
-            Copy-Item -Path (Join-Path $ExtractedDir "node.exe") -Destination $NodeDir -Force
-            Copy-Item -Path (Join-Path $ExtractedDir "npm.cmd") -Destination $NodeDir -Force
-            Copy-Item -Path (Join-Path $ExtractedDir "npx.cmd") -Destination $NodeDir -Force
-            Copy-Item -Path (Join-Path $ExtractedDir "npm") -Destination $NodeDir -Force
-            Copy-Item -Path (Join-Path $ExtractedDir "npx") -Destination $NodeDir -Force
+            Copy-Item -Path (Join-Path $ExtractedDir "node.exe") -Destination $NodejsDir -Force
+            Copy-Item -Path (Join-Path $ExtractedDir "npm.cmd") -Destination $NodejsDir -Force
+            Copy-Item -Path (Join-Path $ExtractedDir "npx.cmd") -Destination $NodejsDir -Force
+            Copy-Item -Path (Join-Path $ExtractedDir "npm") -Destination $NodejsDir -Force
+            Copy-Item -Path (Join-Path $ExtractedDir "npx") -Destination $NodejsDir -Force
             # Use robocopy for node_modules to handle deep paths beyond MAX_PATH (260 chars).
             # PowerShell's Copy-Item -Recurse silently skips files with long paths, corrupting
             # npm's internal dependencies (minizlib/minipass → "Class extends undefined" error).
             $SrcModules = Join-Path $ExtractedDir "node_modules"
-            $DstModules = Join-Path $NodeDir "node_modules"
+            $DstModules = Join-Path $NodejsDir "node_modules"
             if (Test-Path $SrcModules) {
                 & robocopy $SrcModules $DstModules /E /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
                 # robocopy returns 0-7 for success, 8+ for errors
@@ -216,17 +208,17 @@ try {
             }
 
             # Remove corepack (not needed)
-            $corepackCmd = Join-Path $NodeDir "corepack.cmd"
-            $corepackDir = Join-Path $NodeDir "node_modules\corepack"
+            $corepackCmd = Join-Path $NodejsDir "corepack.cmd"
+            $corepackDir = Join-Path $NodejsDir "node_modules\corepack"
             if (Test-Path $corepackCmd) { Remove-Item -Force $corepackCmd }
             if (Test-Path $corepackDir) { Remove-Item -Recurse -Force $corepackDir }
 
             # Upgrade npm — bundled npm 11.9.0 has minizlib CJS bug on Windows.
             # CANNOT use `npm install npm@latest` (catch-22: broken npm can't upgrade itself).
             Write-Host "  升级 npm (curl + tar)..." -ForegroundColor Cyan
-            $npmDir = Join-Path $NodeDir "node_modules\npm"
+            $npmDir = Join-Path $NodejsDir "node_modules\npm"
             try {
-                $nodeExe = Join-Path $NodeDir "node.exe"
+                $nodeExe = $NodejsExePath
                 $oldNpmCli = Join-Path $npmDir "bin\npm-cli.js"
                 $oldVer = if (Test-Path $oldNpmCli) { & $nodeExe $oldNpmCli --version 2>&1 } else { "unknown" }
                 Write-Host "  当前: v$oldVer" -ForegroundColor Gray
@@ -270,7 +262,6 @@ try {
     }
 
     function Get-VCRuntime {
-        $ResourcesDir = Join-Path $ProjectDir "src-tauri\resources"
         if (-not (Test-Path $ResourcesDir)) {
             New-Item -ItemType Directory -Path $ResourcesDir -Force | Out-Null
         }
@@ -464,7 +455,7 @@ try {
 
     Write-Host "`nStep 7/9: 下载 Rust 依赖" -ForegroundColor Blue
     Write-Host "  正在下载 Rust 依赖包，请稍候..." -ForegroundColor Cyan
-    Push-Location (Join-Path $ProjectDir "src-tauri")
+    Push-Location $SrcTauriDir
     & cargo fetch
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  Rust 依赖下载失败" -ForegroundColor Red
@@ -476,26 +467,25 @@ try {
     Pop-Location
     Write-Host "OK - Rust 依赖下载完成" -ForegroundColor Green
 
-    # 准备默认工作区 (mino) — 每次拉取最新版本
+    # 准备默认工作区 (nova) — 每次拉取最新版本
     # .git 不保留：避免 Tauri 资源打包权限问题 + rerun-if-changed 性能问题
-    Write-Host "`nStep 8/9: 准备默认工作区 (mino)" -ForegroundColor Blue
-    $MinoDir = Join-Path $ProjectDir "mino"
-    if (Test-Path $MinoDir) {
-        Remove-Item -Recurse -Force $MinoDir
+    Write-Host "`nStep 8/9: 准备默认工作区 (nova)" -ForegroundColor Blue
+    if (Test-Path $WorkspaceDir) {
+        Remove-Item -Recurse -Force $WorkspaceDir
     }
     Write-Host "  克隆 openmino 默认工作区 (最新版本)..." -ForegroundColor Cyan
-    & git clone git@github.com:hAcKlyc/openmino.git $MinoDir
+    & git clone git@github.com:hAcKlyc/openmino.git $WorkspaceDir
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "  mino 克隆失败" -ForegroundColor Red
+        Write-Host "  nova 克隆失败" -ForegroundColor Red
         Write-Host "`n按回车键退出..." -ForegroundColor Yellow
         Read-Host
         exit 1
     }
-    $MinoGit = Join-Path $MinoDir ".git"
-    if (Test-Path $MinoGit) {
-        Remove-Item -Recurse -Force $MinoGit
+    $NovaGit = Join-Path $WorkspaceDir ".git"
+    if (Test-Path $NovaGit) {
+        Remove-Item -Recurse -Force $NovaGit
     }
-    Write-Host "OK - mino 默认工作区已就绪" -ForegroundColor Green
+    Write-Host "OK - nova 默认工作区已就绪" -ForegroundColor Green
 
     Write-Host "`nStep 9/9: 初始化完成!" -ForegroundColor Blue
     Write-Host "`n=========================================" -ForegroundColor Green
