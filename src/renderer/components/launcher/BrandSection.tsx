@@ -89,7 +89,7 @@ export default memo(function BrandSection({
                     NovaAgents
                 </h1>
                 <p className="brand-slogan text-center text-[15px] text-[var(--ink-muted)] md:text-[17px]">
-                    每个人都应享受智能的推背感，欢迎来到言出法随的世界
+                    一念既起，万事皆成
                 </p>
             </div>
 

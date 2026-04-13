@@ -42,13 +42,43 @@ import { apiGetJson } from '@/api/apiFetch';
  * Manages navigation state and composes the Settings layout.
  * Per D-04: activeSection state lifted to parent (index.tsx).
  */
-export default function Settings() {
+export interface SettingsProps {
+  initialSection?: string;
+  initialMcpId?: string;
+  onSectionChange?: () => void;
+  isActive?: boolean;
+  updateReady?: boolean;
+  updateVersion?: string | null;
+  updateChecking?: boolean;
+  updateDownloading?: boolean;
+  onCheckForUpdate?: () => Promise<'up-to-date' | 'downloading' | 'error'>;
+  onRestartAndUpdate?: () => void;
+}
+
+export default function Settings({
+  initialSection,
+  onSectionChange,
+  isActive: _isActive,
+  updateReady: _updateReady,
+  updateVersion: _updateVersion,
+  updateChecking: _updateChecking,
+  updateDownloading: _updateDownloading,
+  onCheckForUpdate: _onCheckForUpdate,
+  onRestartAndUpdate: _onRestartAndUpdate,
+}: SettingsProps) {
   const { config, providers, apiKeys, providerVerifyStatus } = useConfig();
   const { user } = useAuth();
   const toast = useToast();
 
   // Navigation state management (per D-04: lifted state in index.tsx)
   const [activeSection, setActiveSection] = useState<SettingsSection>('about');
+
+  // Apply initial section from parent (App.tsx)
+  useEffect(() => {
+    if (initialSection) {
+      setActiveSection(initialSection as SettingsSection);
+    }
+  }, [initialSection]);
 
   // App version state (needed for AboutSection)
   const [appVersion, setAppVersion] = useState<string>('');
@@ -191,6 +221,7 @@ export default function Settings() {
 
   const handleSectionChange = (section: SettingsSection) => {
     setActiveSection(section);
+    onSectionChange?.();
   };
 
   // GeneralSection handlers

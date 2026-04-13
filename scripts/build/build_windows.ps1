@@ -12,13 +12,13 @@ $ErrorActionPreference = "Stop"
 $BuildSuccess = $false
 
 try {
-    $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    Set-Location $ProjectDir
+    # 定位到项目根目录 (脚本位于 scripts/build/build_windows.ps1，需要上两层)
+    $ProjectDir = (Resolve-Path ..\..).Path
 
     # 读取版本号
-    $TauriConf = Get-Content "src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json
-    $Version = $TauriConf.version
     $TauriConfPath = Join-Path $ProjectDir "src-tauri\tauri.conf.json"
+    $TauriConf = Get-Content $TauriConfPath -Raw | ConvertFrom-Json
+    $Version = $TauriConf.version
     $EnvFile = Join-Path $ProjectDir ".env"
 
     Write-Host ""
@@ -31,10 +31,10 @@ try {
     # ========================================
     # 版本同步检查
     # ========================================
-    $PkgJson = Get-Content "package.json" -Raw | ConvertFrom-Json
+    $PkgJson = Get-Content (Join-Path $ProjectDir "package.json") -Raw | ConvertFrom-Json
     $PkgVersion = $PkgJson.version
 
-    $CargoToml = Get-Content "src-tauri\Cargo.toml" -Raw
+    $CargoToml = Get-Content (Join-Path $ProjectDir "src-tauri\Cargo.toml") -Raw
     $CargoVersionMatch = [regex]::Match($CargoToml, 'version = "([^"]+)"')
     $CargoVersion = if ($CargoVersionMatch.Success) { $CargoVersionMatch.Groups[1].Value } else { "" }
 
@@ -84,17 +84,40 @@ try {
 
     # 检查 Tauri 签名密钥
     $TauriSigningKey = [Environment]::GetEnvironmentVariable("TAURI_SIGNING_PRIVATE_KEY", "Process")
-    if (-not $TauriSigningKey) {
+    $signingKeyValid = $false
+    $signingKeyShouldClear = $false  # 标记是否需要清除密钥（密钥无效时为 true）
+    if ($TauriSigningKey) {
+        # 验证 base64 密钥格式（不能包含非 base64 字符如 '.'）
+        try {
+            if ($TauriSigningKey -match '^[A-Za-z0-9+/=]+$') {
+                $signingKeyValid = $true
+            } else {
+                Write-Host ""
+                Write-Host "  警告: TAURI_SIGNING_PRIVATE_KEY 格式无效 (包含非 Base64 字符)" -ForegroundColor Yellow
+                Write-Host "  自动更新签名将被跳过" -ForegroundColor Yellow
+                $signingKeyShouldClear = $true
+            }
+        } catch {
+            Write-Host ""
+            Write-Host "  警告: TAURI_SIGNING_PRIVATE_KEY 验证失败" -ForegroundColor Yellow
+            $signingKeyShouldClear = $true
+        }
+    }
+    if (-not $TauriSigningKey -or -not $signingKeyValid) {
         Write-Host ""
         Write-Host "=========================================" -ForegroundColor Yellow
-        Write-Host "  警告: TAURI_SIGNING_PRIVATE_KEY 未设置" -ForegroundColor Yellow
+        Write-Host "  警告: TAURI_SIGNING_PRIVATE_KEY 未设置或格式无效" -ForegroundColor Yellow
         Write-Host "  自动更新功能将不可用!" -ForegroundColor Yellow
         Write-Host "=========================================" -ForegroundColor Yellow
         Write-Host ""
-        $continue = Read-Host "是否继续构建? (Y/n)"
-        if ($continue -eq "n" -or $continue -eq "N") {
-            Write-Host "构建已取消" -ForegroundColor Red
-            throw "用户取消构建"
+        if ($TauriSigningKey -and -not $signingKeyValid) {
+            $continue = Read-Host "是否继续构建? (Y/n)"
+            if ($continue -eq "n" -or $continue -eq "N") {
+                Write-Host "构建已取消" -ForegroundColor Red
+                throw "用户取消构建"
+            }
+            # 用户选择继续，标记需要清除密钥
+            $signingKeyShouldClear = $true
         }
     }
     else {
@@ -578,13 +601,51 @@ try {
     Write-Host ""
 
     # ========================================
+    # 预处理签名配置（密钥无效时禁用 updater artifacts 避免签名失败）
+    # ========================================
+    $buildEnvBackup = $null
+    $updaterArtifactsBackup = $null
+    $updaterArtifactsCleared = $false
+    if ($signingKeyShouldClear) {
+        Write-Host "[准备] 签名密钥无效，禁用 updater artifacts..." -ForegroundColor Yellow
+        $buildEnvBackup = $env:TAURI_SIGNING_PRIVATE_KEY
+        $env:TAURI_SIGNING_PRIVATE_KEY = $null
+        # 禁用 createUpdaterArtifacts（使用 WriteAllText 避免 BOM）
+        $conf = Get-Content $TauriConfPath -Raw | ConvertFrom-Json
+        if ($null -ne $conf.bundle.createUpdaterArtifacts) {
+            $updaterArtifactsBackup = $conf.bundle.createUpdaterArtifacts
+            $conf.bundle.createUpdaterArtifacts = $false
+            $jsonContent = $conf | ConvertTo-Json -Depth 10
+            [System.IO.File]::WriteAllText($TauriConfPath, $jsonContent)
+            $updaterArtifactsCleared = $true
+            Write-Host "  已临时禁用 createUpdaterArtifacts" -ForegroundColor Gray
+        }
+    } elseif (-not $TauriSigningKey) {
+        Write-Host "[准备] TAURI_SIGNING_PRIVATE_KEY 未设置，跳过签名..." -ForegroundColor Gray
+    }
+
+    # ========================================
     # 构建 Tauri 应用
     # ========================================
     Write-Host "[6/7] 构建 Tauri 应用 (Release)..." -ForegroundColor Blue
     Write-Host "  这可能需要几分钟，请耐心等待..." -ForegroundColor Yellow
 
     & bun run tauri:build -- --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
-    if ($LASTEXITCODE -ne 0) {
+    $tauriBuildExitCode = $LASTEXITCODE
+
+    # 恢复签名私钥环境变量
+    if ($null -ne $buildEnvBackup) {
+        $env:TAURI_SIGNING_PRIVATE_KEY = $buildEnvBackup
+    }
+    # 恢复 updater artifacts 配置（使用 WriteAllText 避免 BOM）
+    if ($updaterArtifactsCleared -and $null -ne $updaterArtifactsBackup) {
+        $conf = Get-Content $TauriConfPath -Raw | ConvertFrom-Json
+        $conf.bundle.createUpdaterArtifacts = $updaterArtifactsBackup
+        $jsonContent = $conf | ConvertTo-Json -Depth 10
+        [System.IO.File]::WriteAllText($TauriConfPath, $jsonContent)
+    }
+
+    if ($tauriBuildExitCode -ne 0) {
         throw "Tauri 构建失败"
     }
 
@@ -732,6 +793,20 @@ try {
     if (Test-Path "$TauriConfPath.bak") {
         Move-Item "$TauriConfPath.bak" $TauriConfPath -Force
         Write-Host "已恢复 tauri.conf.json" -ForegroundColor Yellow
+    }
+    # 恢复签名私钥环境变量（如果曾被清空）
+    if ($null -ne $buildEnvBackup) {
+        $env:TAURI_SIGNING_PRIVATE_KEY = $buildEnvBackup
+    }
+    # 恢复 pubkey（如果曾被清空且配置未被 .bak 覆盖）
+    if ($pubkeyCleared -and $null -ne $pubkeyBackup) {
+        $conf = Get-Content $TauriConfPath -Raw | ConvertFrom-Json
+        if ($conf.plugins -and $conf.plugins.updater -and $conf.plugins.updater.pubkey -eq "") {
+            $conf.plugins.updater.pubkey = $pubkeyBackup
+            $jsonContent = $conf | ConvertTo-Json -Depth 10
+            [System.IO.File]::WriteAllText($TauriConfPath, $jsonContent)
+            Write-Host "已恢复 plugins.updater.pubkey" -ForegroundColor Yellow
+        }
     }
 }
 

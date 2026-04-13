@@ -95,15 +95,15 @@ export default function Launcher({ onLaunchProject, isStarting, startError: _sta
 
     // ===== Launcher-specific state for BrandSection =====
 
-    // Fallback chain: defaultWorkspacePath → mino project → first project → null
+    // Fallback chain: defaultWorkspacePath → nova project → first project → null
     const resolveDefaultWorkspace = useCallback((projs: Project[]): Project | null => {
         if (config.defaultWorkspacePath) {
             const def = projs.find(p => p.path === config.defaultWorkspacePath);
             if (def) return def;
         }
-        // Fallback: find mino project by path suffix
-        const mino = projs.find(p => p.path.replace(/\\/g, '/').endsWith('/mino'));
-        if (mino) return mino;
+        // Fallback: find nova project by path suffix
+        const nova = projs.find(p => p.path.replace(/\\/g, '/').endsWith('/NOVA'));
+        if (nova) return nova;
         return projs[0] ?? null;
     }, [config.defaultWorkspacePath]);
 

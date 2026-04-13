@@ -5,7 +5,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$PROJECT_DIR = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$PROJECT_DIR = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 # 加载 .env 文件（如果存在）
 $envFile = Join-Path $PROJECT_DIR ".env"

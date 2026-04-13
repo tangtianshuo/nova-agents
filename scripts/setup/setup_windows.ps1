@@ -8,7 +8,7 @@
 $ErrorActionPreference = "Stop"
 
 try {
-    $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $ProjectDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
     Set-Location $ProjectDir
 
     $BunVersion = "1.3.6"

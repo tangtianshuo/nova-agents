@@ -210,8 +210,8 @@ export interface WorkspaceTemplate {
  */
 export const PRESET_TEMPLATES: WorkspaceTemplate[] = [
   {
-    id: 'mino',
-    name: 'Mino',
+    id: 'NOVA',
+    name: 'NOVA',
     description: '能记忆、会进化的 AI Agent。从 minimal 开始，长成你想要的样子。',
     icon: 'lightning',
     isBuiltin: true,

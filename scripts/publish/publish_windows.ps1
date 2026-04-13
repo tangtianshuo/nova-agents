@@ -42,7 +42,7 @@ function Cleanup-TempFiles {
 
 try {
 
-$ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $ProjectDir
 
 # 读取版本号
@@ -494,7 +494,7 @@ Write-Host ""
 # ========================================
 Write-Host "上传到 GitHub Release..." -ForegroundColor Cyan
 
-$ghScript = Join-Path $ProjectDir "upload_github_release_win.ps1"
+$ghScript = Join-Path $ProjectDir "scripts\publish\upload_github_release_win.ps1"
 try {
     & $ghScript
     Write-Host "  [OK] GitHub Release 上传完成" -ForegroundColor Green

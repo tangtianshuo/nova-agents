@@ -185,10 +185,10 @@ export async function ensureBundledWorkspace(): Promise<boolean> {
 
         if (result.is_new) {
             const project = await addProject(result.path);
-            // Set Mino icon and display name for the bundled workspace
+            // Set Nova icon and display name for the bundled workspace
             const { patchProject } = await import('./projectService');
             try {
-                await patchProject(project.id, { icon: 'lightning', displayName: 'Mino' });
+                await patchProject(project.id, { icon: 'lightning', displayName: 'NOVA' });
             } catch (e) {
                 console.warn('[configService] Failed to set bundled workspace icon:', e);
             }
@@ -209,7 +209,7 @@ export async function ensureBundledWorkspace(): Promise<boolean> {
             const project = await addProject(result.path);
             const { patchProject } = await import('./projectService');
             try {
-                await patchProject(project.id, { icon: 'lightning', displayName: 'Mino' });
+                await patchProject(project.id, { icon: 'lightning', displayName: 'NOVA' });
             } catch (e) {
                 console.warn('[configService] Failed to set recovered workspace icon:', e);
             }

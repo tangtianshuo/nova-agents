@@ -49,7 +49,7 @@ function Format-FileSize {
 
 try {
 
-$ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $ProjectDir
 
 # 配置

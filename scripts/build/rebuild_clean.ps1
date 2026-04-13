@@ -13,7 +13,7 @@ Write-Host "║  🔧 nova-agents 彻底清理重建                            
 Write-Host "╚═══════════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
-$ProjectDir = $PSScriptRoot
+$ProjectDir = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $ProjectDir
 
 # ========================================
@@ -167,7 +167,7 @@ Write-Host ""
 Write-Host "[6/6] 开始构建..." -ForegroundColor Blue
 Write-Host ""
 
-& "$ProjectDir\build_windows.ps1"
+& (Join-Path $ProjectDir "scripts\build\build_windows.ps1")
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""

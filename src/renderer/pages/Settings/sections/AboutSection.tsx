@@ -92,6 +92,21 @@ export default function AboutSection({
         </div>
       </div>
 
+      <div className="rounded-xl border border-[var(--line)] bg-[var(--paper-elevated)] px-7 py-6">
+        <p className="text-xs font-medium uppercase tracking-widest text-[var(--ink-muted)]/50">Inspiration</p>
+        <div className="mt-4 space-y-4 text-[13px] leading-[1.9] text-[var(--ink-secondary)]">
+          <p>
+            <ExternalLink href="https://github.com/HacKlyc/MyAgents" className="font-semibold text-[var(--ink)] hover:text-[var(--accent)]">
+              MyAgents
+            </ExternalLink>
+            {' '}是这个项目的起点与基石。其开创性的架构启发了 NovaAgents 的诞生，我们在其基础上进行了面向桌面端场景的深度重构，并以更优雅的方式实现了全新的交互范式。
+          </p>
+          <p className="text-center text-[14px] font-medium italic tracking-wide text-[var(--ink)]">
+           站在巨人的肩上，我们致力于青出于蓝。
+          </p>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-[var(--line)] bg-[var(--paper-elevated)] p-5">
         <div className="flex items-center justify-between">
           <div>
