@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-04-15
+
+### Added 
+- **登录** ： 增加了用户登录功能。后续将形成用户体系。
+
+### Fixed
+- **自动更新失败**：修复无法更新的问题
+- **文本问题**：修复多处界面文本错误和不一致
+
+---
+
 ## [0.1.57] - 2026-04-02
 
 ### Added
