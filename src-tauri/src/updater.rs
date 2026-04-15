@@ -119,23 +119,42 @@ pub struct DownloadProgress {
 /// Reads proxy settings from ~/.nova-agents/config.json:
 /// - Proxy enabled → `.proxy(url)`
 /// - No proxy configured → inherit system network behavior (respect system proxy)
+/// Also explicitly reads pubkey and endpoints from tauri.conf.json plugins.updater,
+/// as the automatic config reading may not work reliably in all builds.
 fn build_updater_with_proxy(app: &AppHandle) -> Result<tauri_plugin_updater::Updater, String> {
     let target = get_update_target();
-    let mut builder = app.updater_builder().target(target.to_string());
+    let endpoint = get_update_endpoint(app, target);
+
+    // Extract pubkey from plugins.updater.pubkey in tauri.conf.json
+    let pubkey = app
+        .config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|v| v.get("pubkey"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "Updater pubkey not found in tauri.conf.json plugins.updater.pubkey".to_string())?;
+
+    let mut builder = app.updater_builder();
+    builder = builder.target(target.to_string());
+    builder = builder.pubkey(pubkey);
+    let endpoint_url = reqwest::Url::parse(&endpoint)
+        .map_err(|e| format!("Invalid endpoint URL '{}': {}", endpoint, e))?;
+    let builder = builder.endpoints(vec![endpoint_url])
+        .map_err(|e| format!("Failed to set updater endpoints: {}", e))?;
 
     if let Some(proxy_settings) = proxy_config::read_proxy_settings() {
         let proxy_url = proxy_config::get_proxy_url(&proxy_settings)?;
         log::info!("[Updater] Using proxy for update requests: {}", proxy_url);
         let url = reqwest::Url::parse(&proxy_url)
             .map_err(|e| format!("Invalid proxy URL '{}': {}", proxy_url, e))?;
-        builder = builder.proxy(url);
+        builder.proxy(url).build().map_err(|e| format!("Failed to build updater: {}", e))
     } else {
         log::info!("[Updater] No proxy configured, inheriting system network behavior");
         // Don't call .no_proxy() — let the updater respect system proxy settings
         // (Clash TUN, global proxy, etc.) just like other normal applications.
+        builder.build().map_err(|e| format!("Failed to build updater: {}", e))
     }
-
-    builder.build().map_err(|e| format!("Failed to build updater: {}", e))
 }
 
 /// Check for updates on startup and silently download if available
@@ -195,11 +214,12 @@ async fn check_and_download_silently(app: &AppHandle) -> Result<Option<String>, 
 
     // Build updater with user's proxy configuration
     let updater = build_updater_with_proxy(app)?;
+    let endpoint = get_update_endpoint(app, target);
     logger::info(
         app,
         format!(
-            "[Updater] Checking for updates... Current: v{}, Target: {}, Endpoint: https://download.novaagents.io/update/{}.json",
-            current_version, target, target
+            "[Updater] Checking for updates... Current: v{}, Target: {}, Endpoint: {}",
+            current_version, target, endpoint
         ),
     );
 
@@ -460,18 +480,42 @@ pub async fn install_pending_update(app: AppHandle) -> Result<(), String> {
 }
 
 /// Expected JSON structure for Tauri v2 updater (per-platform file)
+///
 /// Reference: https://v2.tauri.app/plugin/updater/
-/// Required fields: version, signature, url
-/// Optional fields: notes, pub_date
+/// All fields are optional to avoid parse errors on non-standard responses
+/// (e.g., Cloudflare challenges, redirects, different CDN formats).
 #[derive(Clone, Serialize, serde::Deserialize, Debug)]
 struct UpdateJsonFormat {
-    version: String,
+    #[serde(default)]
+    version: Option<String>,
     #[serde(default)]
     notes: Option<String>,
     #[serde(default)]
     pub_date: Option<String>,
-    signature: String,
-    url: String,
+    #[serde(default)]
+    signature: Option<String>,
+    #[serde(default)]
+    url: Option<String>,
+}
+
+/// Read the update endpoint URL from tauri.conf.json plugins.updater.endpoints.
+/// The endpoint template contains `{{target}}` which is replaced with the actual target.
+/// Returns the first endpoint from the config, or falls back to a hardcoded default.
+fn get_update_endpoint(app: &AppHandle, target: &str) -> String {
+    // PluginConfig is a tuple struct wrapping a Map<String, Value>
+    app.config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|v| v.get("endpoints"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|v| v.as_str())
+        .map(|template| template.replace("{{target}}", target))
+        .unwrap_or_else(|| {
+            // Fallback to hardcoded default if config is missing
+            format!("https://download.nova-agents.io/update/{}.json", target)
+        })
 }
 
 /// Get the update target string for the current platform
@@ -501,7 +545,7 @@ pub async fn test_update_connectivity(app: AppHandle) -> Result<String, String> 
     // Detect architecture
     let target = get_update_target();
 
-    let url = format!("https://download.novaagents.io/update/{}.json", target);
+    let url = get_update_endpoint(&app, target);
     logger::info(&app, format!("[Updater] Testing HTTP connectivity to: {}", url));
 
     // Build a reqwest client with user's proxy configuration
@@ -545,10 +589,10 @@ pub async fn test_update_connectivity(app: AppHandle) -> Result<String, String> 
     let json_parse_result = match serde_json::from_str::<UpdateJsonFormat>(&body) {
         Ok(parsed) => {
             format!(
-                "✓ JSON valid!\n  version: {}\n  url: {}\n  signature length: {} chars",
-                parsed.version,
-                parsed.url,
-                parsed.signature.len()
+                "✓ JSON valid!\n  version: {}\n  url: {}\n  signature: {}",
+                parsed.version.as_deref().unwrap_or("(none)"),
+                parsed.url.as_deref().unwrap_or("(none)"),
+                parsed.signature.as_ref().map(|s| format!("{} chars", s.len())).as_deref().unwrap_or("(none)")
             )
         }
         Err(e) => format!("✗ JSON parse error: {}", e),

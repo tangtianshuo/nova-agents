@@ -3242,10 +3242,10 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                     <div>
                                         <p className="text-xs font-medium uppercase tracking-wider text-[var(--ink-muted)]">Website</p>
                                         <ExternalLink
-                                            href="https://novai.net.cn"
+                                            href="https://agent.novai.net.cn"
                                             className="mt-1 block text-[var(--accent)] hover:underline"
                                         >
-                                            novai.net.cn
+                                           agent.novai.net.cn
                                         </ExternalLink>
                                     </div>
                                     <div>

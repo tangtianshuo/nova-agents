@@ -269,12 +269,12 @@
   /* ========== Colors: Ink (Text) - Dark for light glass bg ========== */
   --ink: #1e1b4b;
   --ink-secondary: #312e81;
-  --ink-muted: #6366f1;
+  --ink-muted: #1a6ce6;
   --ink-subtle: #818cf8;
   --ink-faint: #a5b4fc;
 
   /* ========== Colors: Paper (Background) ========== */
-  --paper: #fff4b330;
+  --paper: rgba(230, 229, 198, 0.457);
   --paper-elevated: rgba(255, 255, 255, 0.7);
   --paper-inset: rgba(255, 255, 255, 0.4);
   --hover-bg: rgba(99, 102, 241, 0.08);
@@ -355,8 +355,8 @@
   --focus-border: #6366f1;
 
   /* ========== Toggle ========== */
-  --toggle-thumb: #ffffff;
-  --toggle-off-bg: rgba(0, 0, 0, 0.1);
+  --toggle-thumb: #433fba;
+  --toggle-off-bg: rgba(255, 255, 255, 0.1);
 
   /* ========== Code Block ========== */
   --code-bg: #1e1b4b;
