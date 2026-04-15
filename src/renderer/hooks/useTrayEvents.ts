@@ -14,6 +14,8 @@ interface TrayEventsOptions {
   onExitRequested?: () => Promise<boolean>;
   /** Callback when notification click triggers navigation to a specific tab */
   onNavigateToTab?: (tabId: string) => void;
+  /** Callback when deferred update is scheduled and exit is requested - handles its own exit flow */
+  onDeferredExitRequested?: () => void;
 }
 
 export function useTrayEvents(options: TrayEventsOptions) {
@@ -103,7 +105,7 @@ export function useTrayEvents(options: TrayEventsOptions) {
         // Listen for window close request (X button)
         unlistenCloseRequested = await listen('window:close-requested', async () => {
           console.log('[useTrayEvents] Window close requested');
-          const { minimizeToTray } = optionsRef.current;
+          const { minimizeToTray, onDeferredExitRequested } = optionsRef.current;
 
           if (minimizeToTray) {
             // Hide to tray instead of closing
@@ -113,6 +115,12 @@ export function useTrayEvents(options: TrayEventsOptions) {
             setWindowVisible(false); // Update notification service state
             console.log('[useTrayEvents] Window hidden to tray');
           } else {
+            // Check if deferred exit is scheduled first
+            if (onDeferredExitRequested) {
+              onDeferredExitRequested();
+              return; // Don't emit confirm-exit - let deferred handler manage exit
+            }
+
             // Check if exit callback returns true (can exit)
             const { onExitRequested } = optionsRef.current;
             if (onExitRequested) {
@@ -140,6 +148,14 @@ export function useTrayEvents(options: TrayEventsOptions) {
         // Listen for tray "exit" menu click
         unlistenExitRequested = await listen('tray:exit-requested', async () => {
           console.log('[useTrayEvents] Exit requested from tray');
+          const { onDeferredExitRequested } = optionsRef.current;
+
+          // Check if deferred exit is scheduled first
+          if (onDeferredExitRequested) {
+            onDeferredExitRequested();
+            return; // Don't emit confirm-exit - let deferred handler manage exit
+          }
+
           const { onExitRequested } = optionsRef.current;
           if (onExitRequested) {
             const canExit = await onExitRequested();

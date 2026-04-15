@@ -5,6 +5,7 @@ import { initAnalytics, track } from '@/analytics';
 import { stopTabSidecar, startGlobalSidecar, initGlobalSidecarReadyPromise, markGlobalSidecarReady, getGlobalServerUrl, getSessionActivation, updateSessionTab, ensureSessionSidecar, releaseSessionSidecar, activateSession, deactivateSession, upgradeSessionId, getSessionPort, stopSseProxy, startBackgroundCompletion, cancelBackgroundCompletion, updateGlobalServerUrl } from '@/api/tauriClient';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import BugReportOverlay from '@/components/BugReportOverlay';
+import UpdateRestartOverlay, { type UpdateRestartOverlayHandle } from '@/components/UpdateRestartOverlay';
 import CustomTitleBar from '@/components/CustomTitleBar';
 import TabBar from '@/components/TabBar';
 import TabProvider from '@/context/TabProvider';
@@ -185,15 +186,18 @@ const MemoizedTabContent = memo(function TabContent({
 
 export default function App() {
   // Auto-update state (silent background updates)
-  const { updateReady, updateVersion, restartAndUpdate, checking: updateChecking, downloading: updateDownloading, checkForUpdate, pendingUpdateOnStartup, dismissPendingUpdate, updateDownloaded, applyUpdateNow, deferUpdate } = useUpdater();
+  const { updateReady, updateVersion, checking: updateChecking, downloading: updateDownloading, checkForUpdate, pendingUpdateOnStartup, dismissPendingUpdate, updateDownloaded, applyUpdateNow, deferUpdate, deferUpdateScheduled, registerUpdateRestartOverlay, registerProgressUpdater } = useUpdater();
 
-  // Stable callback for Settings prop — ref pattern ensures memo comparator correctness
-  const restartAndUpdateRef = useRef(restartAndUpdate);
-  restartAndUpdateRef.current = restartAndUpdate;
+  // Refs for deferred update state — accessed in onExitRequested callback which may run stale
+  const deferUpdateScheduledRef = useRef(deferUpdateScheduled);
+  const updateVersionRef = useRef(updateVersion);
+  deferUpdateScheduledRef.current = deferUpdateScheduled;
+  updateVersionRef.current = updateVersion;
 
+  // Handle titlebar "重启更新" button click
   const handleRestartAndUpdate = useCallback(() => {
-    void restartAndUpdateRef.current();
-  }, []);
+    void applyUpdateNow();
+  }, [applyUpdateNow]);
 
   // App config for tray behavior (shared via ConfigProvider — no CONFIG_CHANGED event needed)
   // Also get projects + CRUD actions for bug report (ensureSelfAwarenessWorkspace needs them)
@@ -248,6 +252,20 @@ export default function App() {
     runningTaskCount: number;
     resolve: (value: boolean) => void;
   } | null>(null);
+
+  // Update restart overlay state
+  const [showUpdateRestartOverlay, setShowUpdateRestartOverlay] = useState(false);
+  // Ref to control UpdateRestartOverlay progress
+  const updateOverlayRef = useRef<UpdateRestartOverlayHandle | null>(null);
+
+  // Register callbacks with useUpdater
+  useEffect(() => {
+    registerUpdateRestartOverlay?.(setShowUpdateRestartOverlay);
+    registerProgressUpdater?.((progress, tip) => {
+      updateOverlayRef.current?.setProgress(progress, tip);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- these are stable (defined in useUpdater)
+  }, [registerUpdateRestartOverlay, registerProgressUpdater]);
 
   // Claude settings env override warning (cc-switch etc.)
   const [claudeEnvOverride, setClaudeEnvOverride] = useState<{
@@ -1613,6 +1631,10 @@ export default function App() {
       // No running tasks, allow exit
       return true;
     },
+    onDeferredExitRequested: () => {
+      // Deferred update is scheduled - show overlay with real progress
+      void applyUpdateNow();
+    },
   });
 
   // Listen for cron task notifications from Rust (notification:show)
@@ -1654,7 +1676,7 @@ export default function App() {
           onOpenBugReport={() => setShowBugReport(true)}
           updateReady={updateReady}
           updateVersion={updateVersion}
-          onRestartAndUpdate={() => void restartAndUpdate()}
+          onRestartAndUpdate={handleRestartAndUpdate}
         >
           <TabBar
             tabs={tabs}
@@ -1729,7 +1751,7 @@ export default function App() {
             confirmVariant="primary"
             onConfirm={() => {
               dismissPendingUpdate();
-              void restartAndUpdate();
+              void applyUpdateNow();
             }}
             onCancel={dismissPendingUpdate}
           />
@@ -1822,6 +1844,18 @@ export default function App() {
             providers={appProviders}
             apiKeys={appApiKeys}
             providerVerifyStatus={appProviderVerifyStatus}
+          />
+        )}
+
+        {/* Update restart overlay - shows real progress during shutdown and install */}
+        {showUpdateRestartOverlay && updateVersion && (
+          <UpdateRestartOverlay
+            ref={updateOverlayRef}
+            version={updateVersion}
+            onComplete={() => {
+              // Restart is handled by applyUpdateNow with progress updates
+              // This is called only if app hasn't exited (shouldn't happen in practice)
+            }}
           />
         )}
       </div>

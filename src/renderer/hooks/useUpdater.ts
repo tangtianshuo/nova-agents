@@ -44,10 +44,16 @@ interface UseUpdaterResult {
     dismissPendingUpdate: () => void;
     /** Whether an update has been downloaded and is awaiting user confirmation (true = show dialog) */
     updateDownloaded: boolean;
-    /** Confirm and install the update now */
+    /** Confirm and install the update now - shows overlay before restart */
     applyUpdateNow: () => Promise<void>;
     /** Defer the update - keep titlebar button visible for later */
     deferUpdate: () => void;
+    /** Whether defer update is scheduled (user clicked "Later" and will update on exit) */
+    deferUpdateScheduled: boolean;
+    /** Internal: setShowUpdateRestartOverlay callback from App */
+    registerUpdateRestartOverlay?: (fn: (show: boolean) => void) => void;
+    /** Internal: register progress updater for overlay */
+    registerProgressUpdater?: (fn: (progress: number, tip: string) => void) => void;
 }
 
 // Detect Windows platform
@@ -65,6 +71,8 @@ export function useUpdater(): UseUpdaterResult {
     const [pendingUpdateOnStartup, setPendingUpdateOnStartup] = useState<string | null>(null);
     // Whether update is downloaded but user hasn't responded to the dialog yet
     const [updateDownloaded, setUpdateDownloaded] = useState(false);
+    // Whether user clicked "Later" and update should happen on next exit
+    const [deferUpdateScheduled, setDeferUpdateScheduled] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const updateReadyRef = useRef(false);
     // Ref guards for checkForUpdate to prevent race conditions on rapid clicks.
@@ -73,6 +81,10 @@ export function useUpdater(): UseUpdaterResult {
     const downloadingRef = useRef(false);
     // Cache app version — it never changes during a session, no need to IPC every time.
     const appVersionRef = useRef<string | null>(null);
+    // Callback to show update restart overlay in App (injected from App.tsx)
+    const setShowUpdateRestartOverlayRef = useRef<((show: boolean) => void) | undefined>(undefined);
+    // Progress updater for overlay (injected from App.tsx via UpdateRestartOverlay ref)
+    const progressUpdaterRef = useRef<((progress: number, tip: string) => void) | undefined>(undefined);
 
     // Keep ref in sync with state
     useEffect(() => {
@@ -216,15 +228,88 @@ export function useUpdater(): UseUpdaterResult {
     }, [updateVersion]);
 
     // Apply update now (user clicked "Yes" in the dialog)
+    // Shows overlay with real progress during shutdown and install
     const applyUpdateNow = useCallback(async () => {
-        setUpdateDownloaded(false);
-        await restartAndUpdate();
-    }, [restartAndUpdate]);
+        if (!isTauriEnvironment()) return;
 
-    // Defer update - show titlebar button instead (user clicked "No" in the dialog)
+        setUpdateDownloaded(false);
+        setDeferUpdateScheduled(false);
+
+        // Track update_install event
+        if (updateVersion) {
+            track('update_install', { version: updateVersion });
+        } else {
+            track('update_install');
+        }
+
+        // Show the overlay first
+        setShowUpdateRestartOverlayRef.current?.(true);
+
+        // Small delay to let overlay render
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Phase 1: Shutdown processes (0% -> 50%)
+        const updateProgress = (progress: number, tip: string) => {
+            progressUpdaterRef.current?.(progress, tip);
+        };
+
+        updateProgress(5, '正在关闭后台进程...');
+        try {
+            await invoke('cmd_shutdown_for_update');
+            updateProgress(50, '正在安装更新...');
+        } catch (err) {
+            console.warn('[useUpdater] Pre-restart cleanup failed:', err);
+            updateProgress(50, '正在安装更新...');
+        }
+
+        // Phase 2: Install update (50% -> 100%)
+        // On Windows, install_pending_update launches NSIS and app exits
+        // On macOS, relaunch() restarts the app
+        if (isWindows) {
+            try {
+                await invoke('install_pending_update');
+                // install_pending_update calls exit(0) on Windows, so we won't reach here
+            } catch (err) {
+                const errStr = String(err);
+                if (errStr.includes('VERSION_MISMATCH')) {
+                    console.warn('[useUpdater] Pending update version mismatch, will re-download');
+                    setUpdateReady(false);
+                    setUpdateVersion(null);
+                    setPendingUpdateOnStartup(null);
+                    updateProgress(0, '版本不匹配，正在重新下载...');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    void invoke('check_and_download_update');
+                } else if (errStr.includes('NETWORK_ERROR')) {
+                    console.warn('[useUpdater] Network required to verify update');
+                    updateProgress(50, '网络错误，请检查网络连接');
+                } else {
+                    console.error('[useUpdater] install_pending_update failed:', err);
+                    updateProgress(50, '安装失败');
+                }
+            }
+            return;
+        }
+
+        // macOS: relaunch
+        updateProgress(80, '正在启动新版本...');
+        try {
+            await relaunch();
+        } catch (err) {
+            console.error('[useUpdater] Restart failed:', err);
+            try {
+                await invoke('restart_app');
+            } catch (e) {
+                console.error('[useUpdater] Rust restart also failed:', e);
+            }
+        }
+    }, []);
+
+    // Defer update - show titlebar button instead (user clicked "Later" in the dialog)
+    // Also schedules update on exit
     const deferUpdate = useCallback(() => {
         setUpdateDownloaded(false);
         setUpdateReady(true);
+        setDeferUpdateScheduled(true);
     }, []);
 
     // Listen for update ready event from Rust
@@ -337,5 +422,12 @@ export function useUpdater(): UseUpdaterResult {
         updateDownloaded,
         applyUpdateNow,
         deferUpdate,
+        deferUpdateScheduled,
+        registerUpdateRestartOverlay: (fn: (show: boolean) => void) => {
+            setShowUpdateRestartOverlayRef.current = fn;
+        },
+        registerProgressUpdater: (fn: (progress: number, tip: string) => void) => {
+            progressUpdaterRef.current = fn;
+        },
     };
 }

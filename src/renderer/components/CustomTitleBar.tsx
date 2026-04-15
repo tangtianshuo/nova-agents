@@ -126,10 +126,12 @@ export default function CustomTitleBar({
     const handleClose = async () => {
         if (!isTauri()) return;
         try {
-            const { getCurrentWindow } = await import('@tauri-apps/api/window');
-            await getCurrentWindow().close();
+            // Emit exit-requested event to let useTrayEvents handle the close flow
+            // This allows onExitRequested callback to run (check deferred update, cron tasks, etc.)
+            const { emit } = await import('@tauri-apps/api/event');
+            await emit('tray:exit-requested');
         } catch (e) {
-            console.error('Failed to close:', e);
+            console.error('Failed to emit exit event:', e);
         }
     };
 
