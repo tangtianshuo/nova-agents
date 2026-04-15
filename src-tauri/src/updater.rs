@@ -19,7 +19,7 @@ use crate::proxy_config;
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter};
-use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_updater::{UpdaterExt, Update};
 
 /// Global flag to prevent concurrent update checks/downloads
 static UPDATE_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
@@ -223,7 +223,7 @@ async fn check_and_download_silently(app: &AppHandle) -> Result<Option<String>, 
         ),
     );
 
-    let update = match updater.check().await {
+    let mut update = match updater.check().await {
         Ok(Some(update)) => update,
         Ok(None) => {
             logger::info(app, "[Updater] Server returned no update (current version is latest or newer)");
@@ -243,6 +243,11 @@ async fn check_and_download_silently(app: &AppHandle) -> Result<Option<String>, 
             return Err(format!("Update check failed: {}", e));
         }
     };
+
+    // Replace URL with custom domain if DOWNLOAD_BASE_URL is set
+    if let Some(download_base_url) = get_download_base_url() {
+        replace_update_url(app, &mut update, &download_base_url);
+    }
 
     let version = update.version.clone();
     logger::info(
@@ -476,6 +481,55 @@ pub async fn install_pending_update(app: AppHandle) -> Result<(), String> {
 
         // If we get here (unlikely on Windows), the install completed without exit
         Ok(())
+    }
+}
+
+/// Get the custom download base URL from environment variable DOWNLOAD_BASE_URL.
+/// Loads .env file if present, then reads the environment variable.
+/// Returns None if not set or empty.
+fn get_download_base_url() -> Option<String> {
+    // Try to load .env file from current working directory or parents
+    // This is important for Windows where the working directory may differ
+    let _ = dotenv::dotenv();
+
+    // Also try to load from known location (project root in dev, exe dir in prod)
+    if let Ok(cwd) = std::env::current_dir() {
+        let env_path = cwd.join(".env");
+        if env_path.exists() {
+            let _ = dotenv::from_filename(&env_path);
+        }
+    }
+
+    let value = std::env::var("DOWNLOAD_BASE_URL").ok().filter(|s| !s.is_empty());
+    if let Some(ref handle) = logger::get_app_handle() {
+        if value.is_some() {
+            logger::info(handle, format!("[Updater] DOWNLOAD_BASE_URL found: {}", value.as_ref().unwrap()));
+        } else {
+            logger::info(handle, "[Updater] DOWNLOAD_BASE_URL not found in environment");
+        }
+    }
+    value
+}
+
+/// Replace the URL in the Update struct with a custom domain.
+/// Uses DOWNLOAD_BASE_URL env var to replace the original R2/dev domain.
+/// E.g., https://xxx.r2.dev/nova-agents/releases/... → https://download.novai.net.cn/nova-agents/releases/...
+fn replace_update_url(app: &AppHandle, update: &mut Update, download_base_url: &str) {
+    let original_url = update.download_url.clone();
+    if let Some(path) = original_url.path().strip_prefix("/nova-agents") {
+        // Build new URL: custom_domain + /nova-agents + path
+        // Ensure download_base_url doesn't have trailing slash
+        let base = download_base_url.trim_end_matches('/');
+        let new_url = format!("{}{}", base, path);
+        logger::info(
+            app,
+            format!(
+                "[Updater] Replacing URL:\n  FROM: {}\n  TO: {}",
+                original_url, new_url
+            ),
+        );
+        update.download_url = reqwest::Url::parse(&new_url)
+            .unwrap_or_else(|_| original_url);
     }
 }
 
