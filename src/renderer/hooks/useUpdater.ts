@@ -42,6 +42,12 @@ interface UseUpdaterResult {
     pendingUpdateOnStartup: string | null;
     /** Dismiss the startup pending update dialog (keeps "Restart to Update" button visible) */
     dismissPendingUpdate: () => void;
+    /** Whether an update has been downloaded and is awaiting user confirmation (true = show dialog) */
+    updateDownloaded: boolean;
+    /** Confirm and install the update now */
+    applyUpdateNow: () => Promise<void>;
+    /** Defer the update - keep titlebar button visible for later */
+    deferUpdate: () => void;
 }
 
 // Detect Windows platform
@@ -57,6 +63,8 @@ export function useUpdater(): UseUpdaterResult {
     const [downloading, setDownloading] = useState(false);
     // Windows: version from disk-persisted pending update (shown as startup dialog)
     const [pendingUpdateOnStartup, setPendingUpdateOnStartup] = useState<string | null>(null);
+    // Whether update is downloaded but user hasn't responded to the dialog yet
+    const [updateDownloaded, setUpdateDownloaded] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const updateReadyRef = useRef(false);
     // Ref guards for checkForUpdate to prevent race conditions on rapid clicks.
@@ -207,6 +215,18 @@ export function useUpdater(): UseUpdaterResult {
         }
     }, [updateVersion]);
 
+    // Apply update now (user clicked "Yes" in the dialog)
+    const applyUpdateNow = useCallback(async () => {
+        setUpdateDownloaded(false);
+        await restartAndUpdate();
+    }, [restartAndUpdate]);
+
+    // Defer update - show titlebar button instead (user clicked "No" in the dialog)
+    const deferUpdate = useCallback(() => {
+        setUpdateDownloaded(false);
+        setUpdateReady(true);
+    }, []);
+
     // Listen for update ready event from Rust
     useEffect(() => {
         if (!isTauriEnvironment()) {
@@ -232,7 +252,7 @@ export function useUpdater(): UseUpdaterResult {
                         return;
                     }
                     setUpdateVersion(event.payload.version);
-                    setUpdateReady(true);
+                    setUpdateDownloaded(true);
                     setDownloading(false);
                 });
                 if (isDebugMode()) {
@@ -314,5 +334,8 @@ export function useUpdater(): UseUpdaterResult {
         checkForUpdate,
         pendingUpdateOnStartup,
         dismissPendingUpdate,
+        updateDownloaded,
+        applyUpdateNow,
+        deferUpdate,
     };
 }

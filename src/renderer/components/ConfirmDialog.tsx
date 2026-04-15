@@ -52,22 +52,27 @@ export default function ConfirmDialog({
 
     return (
         <div
-            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 px-4 backdrop-blur-xl"
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm"
             onMouseDown={(e) => { if (e.target === e.currentTarget && !loading) onCancel(); }}
         >
-            <div className="glass-card w-full max-w-sm">
-                <div className="border-b border-white/10 px-5 py-4">
-                    <div className="text-[14px] font-semibold text-[var(--ink)]">{title}</div>
+            <div className="w-full max-w-sm rounded-2xl bg-[var(--paper-elevated)] shadow-xl">
+                {/* Header */}
+                <div className="px-6 pt-5 pb-4">
+                    <h2 className="text-[16px] font-semibold text-[var(--ink)]">{title}</h2>
                 </div>
-                <div className="px-5 py-4">
-                    <p className="text-[13px] leading-relaxed text-[var(--ink-muted)]">{message}</p>
+
+                {/* Message */}
+                <div className="px-6 pb-5">
+                    <p className="text-[14px] leading-relaxed text-[var(--ink-muted)] whitespace-pre-line">{message}</p>
                 </div>
-                <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-3">
+
+                {/* Actions */}
+                <div className="flex justify-end gap-3 border-t border-[var(--line)] px-6 py-4">
                     <button
                         type="button"
                         onClick={onCancel}
                         disabled={loading}
-                        className="rounded-full bg-[var(--button-secondary-bg)] px-4 py-1.5 text-[12px] font-semibold text-[var(--button-secondary-text)] transition-colors hover:bg-[var(--button-secondary-bg-hover)] disabled:opacity-50"
+                        className="rounded-full bg-[var(--button-secondary-bg)] px-5 py-2 text-[13px] font-medium text-[var(--button-secondary-text)] transition-all hover:bg-[var(--button-secondary-bg-hover)] disabled:opacity-50 active:scale-[0.98]"
                     >
                         {finalCancelText}
                     </button>
@@ -75,12 +80,12 @@ export default function ConfirmDialog({
                         type="button"
                         onClick={onConfirm}
                         disabled={loading}
-                        className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[12px] font-semibold text-white transition-colors disabled:opacity-50 ${isDanger
-                            ? 'bg-[var(--error)] hover:brightness-110'
+                        className={`flex items-center gap-2 rounded-full px-5 py-2 text-[13px] font-medium text-white transition-all disabled:opacity-50 active:scale-[0.98] ${isDanger
+                            ? 'bg-[var(--error)] hover:bg-[var(--error-hover)]'
                             : 'bg-[var(--button-primary-bg)] hover:bg-[var(--button-primary-bg-hover)]'
                             }`}
                     >
-                        {loading && <Loader2 className="h-3 w-3 animate-spin" />}
+                        {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                         {finalConfirmText}
                     </button>
                 </div>
@@ -88,4 +93,3 @@ export default function ConfirmDialog({
         </div>
     );
 }
-

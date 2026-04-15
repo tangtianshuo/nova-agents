@@ -185,7 +185,7 @@ const MemoizedTabContent = memo(function TabContent({
 
 export default function App() {
   // Auto-update state (silent background updates)
-  const { updateReady, updateVersion, restartAndUpdate, checking: updateChecking, downloading: updateDownloading, checkForUpdate, pendingUpdateOnStartup, dismissPendingUpdate } = useUpdater();
+  const { updateReady, updateVersion, restartAndUpdate, checking: updateChecking, downloading: updateDownloading, checkForUpdate, pendingUpdateOnStartup, dismissPendingUpdate, updateDownloaded, applyUpdateNow, deferUpdate } = useUpdater();
 
   // Stable callback for Settings prop — ref pattern ensures memo comparator correctness
   const restartAndUpdateRef = useRef(restartAndUpdate);
@@ -1732,6 +1732,23 @@ export default function App() {
               void restartAndUpdate();
             }}
             onCancel={dismissPendingUpdate}
+          />
+        )}
+
+        {/* Update ready dialog - ask user whether to update now or defer to titlebar button */}
+        {updateDownloaded && updateVersion && (
+          <ConfirmDialog
+            title="发现新版本"
+            message={`v${updateVersion} 已下载完成。\n\n请保存当前工作后再进行更新，关闭应用将自动安装此版本。`}
+            confirmText="立即更新"
+            cancelText="稍后"
+            confirmVariant="primary"
+            onConfirm={() => {
+              void applyUpdateNow();
+            }}
+            onCancel={() => {
+              deferUpdate();
+            }}
           />
         )}
 
