@@ -860,6 +860,22 @@ pub async fn cmd_read_workspace_file(path: String) -> Result<Option<String>, Str
     }
 }
 
+/// Hide the overlay window (called from frontend when app is ready)
+#[tauri::command]
+pub async fn cmd_hide_overlay(app: AppHandle) -> Result<(), String> {
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        overlay.hide().map_err(|e| format!("Failed to hide overlay: {}", e))?;
+        ulog_info!("[app] Overlay hidden");
+    }
+    // Show the main window now that overlay is gone
+    if let Some(main) = app.get_webview_window("main") {
+        main.show().map_err(|e| format!("Failed to show main window: {}", e))?;
+        main.set_focus().map_err(|e| format!("Failed to focus main window: {}", e))?;
+        ulog_info!("[app] Main window shown");
+    }
+    Ok(())
+}
+
 /// Write content to a workspace text file, creating parent directories if needed.
 /// Bypasses Tauri fs plugin scope (which only covers ~/.nova-agents).
 #[tauri::command]

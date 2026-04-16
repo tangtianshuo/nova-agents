@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nova-agents</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #faf6ee;
+      font-family: 'SF Pro Text', 'Segoe UI', -apple-system, sans-serif;
+    }
+    .logo {
+      font-size: 36px;
+      font-weight: 300;
+      color: #1c1612;
+      letter-spacing: -0.02em;
+    }
+    .spinner {
+      margin-top: 24px;
+      width: 32px;
+      height: 32px;
+      border: 2px solid #e8dccf;
+      border-top-color: #c26d3a;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">nova-agents</div>
+  <div class="spinner"></div>
+</body>
+</html>

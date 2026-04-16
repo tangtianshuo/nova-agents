@@ -2670,7 +2670,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                                         ? 'bg-[var(--info)]/60 cursor-wait'
                                                         : isEnabled
                                                             ? 'cursor-pointer bg-[var(--accent)]'
-                                                            : 'cursor-pointer bg-[var(--line-strong)]'
+                                                            : 'cursor-pointer bg-[var(--paper-inset)]'
                                                         }`}
                                                     title={isEnabling ? '启用中...' : isEnabled ? '已启用' : '点击启用'}
                                                 >
@@ -2745,7 +2745,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                         } ${
                                             autostartEnabled
                                                 ? 'bg-[var(--accent)]'
-                                                : 'bg-[var(--line-strong)]'
+                                                : 'bg-[var(--paper-inset)]'
                                         }`}
                                     >
                                         <span
@@ -2772,7 +2772,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                         className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
                                             config.minimizeToTray
                                                 ? 'bg-[var(--accent)]'
-                                                : 'bg-[var(--line-strong)]'
+                                                : 'bg-[var(--paper-inset)]'
                                         }`}
                                     >
                                         <span
@@ -2879,7 +2879,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                         className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
                                             config.cronNotifications
                                                 ? 'bg-[var(--accent)]'
-                                                : 'bg-[var(--line-strong)]'
+                                                : 'bg-[var(--paper-inset)]'
                                         }`}
                                     >
                                         <span
@@ -2921,7 +2921,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                         className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
                                             config.proxySettings?.enabled
                                                 ? 'bg-[var(--accent)]'
-                                                : 'bg-[var(--line-strong)]'
+                                                : 'bg-[var(--paper-inset)]'
                                         }`}
                                     >
                                         <span
@@ -3281,7 +3281,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                                 </div>
                                                 <button
                                                     onClick={() => updateConfig({ showDevTools: !config.showDevTools })}
-                                                    className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${config.showDevTools ? 'bg-[var(--accent)]' : 'bg-[var(--line-strong)]'
+                                                    className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${config.showDevTools ? 'bg-[var(--accent)]' : 'bg-[var(--paper-inset)]'
                                                         }`}
                                                 >
                                                     <span
@@ -3303,7 +3303,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                                 </div>
                                                 <button
                                                     onClick={() => updateConfig({ experimentalSplitView: !(config.experimentalSplitView ?? true) })}
-                                                    className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${(config.experimentalSplitView ?? true) ? 'bg-[var(--accent)]' : 'bg-[var(--line-strong)]'
+                                                    className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${(config.experimentalSplitView ?? true) ? 'bg-[var(--accent)]' : 'bg-[var(--paper-inset)]'
                                                         }`}
                                                 >
                                                     <span
@@ -3729,7 +3729,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                 <button
                                     onClick={() => setGeminiImageSettings(prev => prev ? { ...prev, searchGrounding: !prev.searchGrounding } : null)}
                                     className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                                        geminiImageSettings.searchGrounding ? 'bg-[var(--accent)]' : 'bg-[var(--line-strong)]'
+                                        geminiImageSettings.searchGrounding ? 'bg-[var(--accent)]' : 'bg-[var(--paper-inset)]'
                                     }`}
                                 >
                                     <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-[var(--toggle-thumb)] shadow transition-transform ${
@@ -3802,7 +3802,7 @@ export default function Settings({ initialSection, initialMcpId, onSectionChange
                                 <button
                                     onClick={() => setPlaywrightSettings(prev => prev ? { ...prev, headless: !prev.headless } : null)}
                                     className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                                        playwrightSettings.headless ? 'bg-[var(--accent)]' : 'bg-[var(--line-strong)]'
+                                        playwrightSettings.headless ? 'bg-[var(--accent)]' : 'bg-[var(--paper-inset)]'
                                     }`}
                                 >
                                     <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-[var(--toggle-thumb)] shadow transition-transform ${

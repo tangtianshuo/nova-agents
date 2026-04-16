@@ -317,6 +317,10 @@ export default function App() {
       emit('startup:stage', { stage: 4, name: 'Sidecar Ready', status: 'complete' });
       emit('startup:complete', null);
 
+      // Hide the native overlay window now that frontend is ready
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('cmd_hide_overlay');
+
       // Set log server URL to global sidecar for unified logging
       try {
         const globalUrl = await getGlobalServerUrl();
