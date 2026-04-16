@@ -64,6 +64,7 @@ Plan: 1 of 2 (both plans complete)
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260416-red | 使用tauri2 setupoverlay 注册启动页 | 2026-04-16 | c4fb65d | [260416-red-tauri2-setupoverlay](./quick/260416-red-tauri2-setupoverlay/) |
+| 260416-roc | 移除 React StartupProgressOverlay 组件 | 2026-04-16 | 2994e42 | [260416-roc-react-startupprogressoverlay](./quick/260416-roc-react-startupprogressoverlay/) |
 
 ---
 
