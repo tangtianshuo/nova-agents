@@ -293,6 +293,9 @@ export default function App() {
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
 
+  // Startup profiling - track frontend mount time for startup timing
+  const startupStartRef = useRef(performance.now());
+
   // Silent background retry with exponential backoff
   const startGlobalSidecarSilent = useCallback(async () => {
     const MAX_RETRIES = 5;
@@ -386,12 +389,34 @@ export default function App() {
     let unlistenTaskRecovered: (() => void) | null = null;
     let unlistenBgComplete: (() => void) | null = null;
     let unlistenSidecarRestarted: (() => void) | null = null;
+    let unlistenStartupStage: (() => void) | null = null;
 
     const setupCronRecoveryListeners = async () => {
       if (!isTauriEnvironment()) return;
 
       try {
         const { listen } = await import('@tauri-apps/api/event');
+
+        // Listen for Rust startup stage events and profile frontend timing
+        unlistenStartupStage = await listen<{ stage: number; name: string; status: string; elapsed_ms?: number }>(
+          'startup:stage',
+          (event) => {
+            if (mountedRef.current) {
+              const { stage, name, elapsed_ms } = event.payload;
+              const frontendElapsed = Math.round(performance.now() - startupStartRef.current);
+              console.log(`[startup:profile] Stage ${stage} (${name}) frontend_elapsed=${frontendElapsed}ms rust_elapsed=${elapsed_ms ?? 'N/A'}ms`);
+            }
+          }
+        );
+
+        // Listen for startup complete to log total frontend startup time
+        // Note: This event fires once at startup, no need to track unlisten
+        listen('startup:complete', () => {
+          if (mountedRef.current) {
+            const totalMs = Math.round(performance.now() - startupStartRef.current);
+            console.log(`[startup:profile] Frontend startup complete: ${totalMs}ms`);
+          }
+        });
 
         // Listen for background session completion events
         unlistenBgComplete = await listen<{ sessionId: string; sidecarStopped: boolean }>(
@@ -488,6 +513,9 @@ export default function App() {
       }
       if (unlistenSidecarRestarted) {
         unlistenSidecarRestarted();
+      }
+      if (unlistenStartupStage) {
+        unlistenStartupStage();
       }
       // Flush any pending frontend logs before shutdown
       forceFlushLogs();
