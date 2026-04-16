@@ -247,6 +247,27 @@ pub fn run() {
             commands::cmd_open_file,
         ])
         .setup(|app| {
+            // Show native overlay during Rust initialization (before webview content loads).
+            // This replaces the React-based StartupProgressOverlay.
+            // The main window is created by app.build() AFTER .setup() returns,
+            // so any window created here appears before the main webview.
+            // Frontend dismisses it via app.hide() after startup:complete is emitted.
+            use tauri::WebviewWindowBuilder;
+            match WebviewWindowBuilder::new(
+                app,
+                "overlay",
+                tauri::WebviewUrl::App("index.html".into()),
+            )
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .transparent(true)
+            .build()
+            {
+                Ok(_) => log::info!("[App] Native overlay shown during initialization"),
+                Err(e) => log::warn!("[App] Failed to create overlay window: {}", e),
+            }
+
             // Initialize logging FIRST — acquire_lock() and cleanup_stale_sidecars()
             // need a logger backend for their log::warn!/info! calls.
             use tauri_plugin_log::{Target, TargetKind};
