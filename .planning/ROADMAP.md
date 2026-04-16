@@ -43,7 +43,7 @@
 **Requirements:** REQ-07-01, REQ-07-02, REQ-07-03, REQ-07-04
 
 **Plans:**
-- [x] 07-01-PLAN.md — Frontend: StartupProgressOverlay component, useStartupProgress hook, App.tsx integration
+2/2 plans complete
 - [x] 07-02-PLAN.md — Rust: Emit startup:stage events from lib.rs
 
 **Status:** Planned
