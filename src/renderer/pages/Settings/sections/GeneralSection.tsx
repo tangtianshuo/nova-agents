@@ -38,7 +38,7 @@ function ToggleSwitch({
           ? 'cursor-wait bg-[var(--info)]/60'
           : enabled
             ? 'cursor-pointer bg-[var(--accent)]'
-            : 'cursor-pointer bg-[var(--ink-secondary)]'
+            : 'cursor-pointer bg-[var(--paper-inset)]'
       }`}
     >
       <span
