@@ -36,6 +36,7 @@ use sidecar::{
 };
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::time::Instant;
 use tauri::{Emitter, Listener, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 
@@ -249,6 +250,9 @@ pub fn run() {
             commands::cmd_hide_overlay,
         ])
         .setup(|app| {
+            // Startup profiling - track time to each stage milestone
+            let startup_timer = Instant::now();
+
             // Create main window (hidden) — shown when overlay dismisses
             use tauri::WebviewWindowBuilder;
             match WebviewWindowBuilder::new(
@@ -373,13 +377,17 @@ pub fn run() {
 
             // Emit startup stage 1 (System Core) after tray setup - deferred to async to ensure frontend is listening
             let app_handle_for_s1 = app.handle().clone();
+            let startup_timer_for_s1 = startup_timer;
             tauri::async_runtime::spawn(async move {
                 // Small delay to ensure frontend webview has mounted and is listening
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                let elapsed = startup_timer_for_s1.elapsed().as_millis();
+                ulog_info!("[startup:profile] stage=1 name=SystemCore elapsed={}ms", elapsed);
                 let _ = app_handle_for_s1.emit("startup:stage", serde_json::json!({
                     "stage": 1,
                     "name": "System Core",
-                    "status": "complete"
+                    "status": "complete",
+                    "elapsed_ms": elapsed
                 }));
                 log::info!("[App] Startup stage 1 (System Core) emitted");
             });
@@ -428,15 +436,19 @@ pub fn run() {
 
             // Start management API (internal HTTP server for Bun→Rust IPC)
             let app_for_mgmt = app.handle().clone();
+            let startup_timer_for_mgmt = startup_timer;
             tauri::async_runtime::spawn(async move {
                 match management_api::start_management_api().await {
                     Ok(port) => {
                         log::info!("[App] Management API started on port {}", port);
+                        let elapsed = startup_timer_for_mgmt.elapsed().as_millis();
+                        ulog_info!("[startup:profile] stage=2 name=TrayManagementAPI elapsed={}ms", elapsed);
                         // Emit startup stage 2 (Tray & Management API)
                         let _ = app_for_mgmt.emit("startup:stage", serde_json::json!({
                             "stage": 2,
                             "name": "Tray & Management API",
-                            "status": "complete"
+                            "status": "complete",
+                            "elapsed_ms": elapsed
                         }));
                         log::info!("[App] Startup stage 2 (Tray & Management API) emitted");
                     }
@@ -447,14 +459,18 @@ pub fn run() {
             // Initialize cron task manager with app handle
             let cron_app_handle = app.handle().clone();
             let app_for_s3 = app.handle().clone();
+            let startup_timer_for_s3 = startup_timer;
             tauri::async_runtime::spawn(async move {
                 cron_task::initialize_cron_manager(cron_app_handle).await;
+                let elapsed = startup_timer_for_s3.elapsed().as_millis();
+                ulog_info!("[startup:profile] stage=3 name=SchedulerMonitors elapsed={}ms", elapsed);
                 // Emit startup stage 3 (Scheduler & Monitors)
                 // Note: initialize_cron_manager emits cron:manager-ready internally
                 let _ = app_for_s3.emit("startup:stage", serde_json::json!({
                     "stage": 3,
                     "name": "Scheduler & Monitors",
-                    "status": "complete"
+                    "status": "complete",
+                    "elapsed_ms": elapsed
                 }));
                 log::info!("[App] Startup stage 3 (Scheduler & Monitors) emitted");
             });
@@ -512,6 +528,12 @@ pub fn run() {
                 log::info!("[App] Background update task completed");
             });
             log::info!("[App] Background update task spawned successfully");
+
+            // Startup profiling summary: log total setup time when returning to Tauri.
+            // Note: Stages 2 and 3 emit independently via async tasks - see their
+            // individual [startup:profile] logs for per-stage timings.
+            let total_setup_ms = startup_timer.elapsed().as_millis();
+            ulog_info!("[startup:profile] setup complete total_setup_ms={}", total_setup_ms);
 
             Ok(())
         })
