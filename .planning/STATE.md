@@ -59,9 +59,17 @@ Plan: 1 of 2 (both plans complete)
 
 ## Session Continuity
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260416-red | 使用tauri2 setupoverlay 注册启动页 | 2026-04-16 | c4fb65d | [260416-red-tauri2-setupoverlay](./quick/260416-red-tauri2-setupoverlay/) |
+
+---
+
 ### Last Action
 
-Completed Phase 07-01 execution. StartupProgressOverlay + useStartupProgress hook + App.tsx integration committed. TypeScript passes.
+Completed quick task 260416-red: Tauri setupoverlay integration — replaced non-existent `app.setup_overlay()` with `WebviewWindowBuilder` in `.setup()` to show native overlay during Rust initialization.
 
 ### Next Step
 
