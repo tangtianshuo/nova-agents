@@ -32,7 +32,7 @@
 | 4. Dialogs & Quality Assurance | v1.0 | 6/6 | Complete | 2026-04-12 |
 | 5. Auto Update Optimization | v1.0 | 1/1 | Complete | 2026-04-16 |
 | 6. Shutdown Progress Overlay | v1.0 | 1/1 | Complete | 2026-04-16 |
-| 7. Startup Progress Bar | v1.0 | 1/2 | In Progress|  |
+| 7. Startup Progress Bar | v1.0 | 2/2 | Complete   | 2026-04-16 |
 
 ---
 
@@ -43,7 +43,7 @@
 **Requirements:** REQ-07-01, REQ-07-02, REQ-07-03, REQ-07-04
 
 **Plans:**
-- [ ] 07-01-PLAN.md — Frontend: StartupProgressOverlay component, useStartupProgress hook, App.tsx integration
+- [x] 07-01-PLAN.md — Frontend: StartupProgressOverlay component, useStartupProgress hook, App.tsx integration
 - [x] 07-02-PLAN.md — Rust: Emit startup:stage events from lib.rs
 
 **Status:** Planned
