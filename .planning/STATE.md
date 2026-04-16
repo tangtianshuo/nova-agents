@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-04-16T12:50:51.215Z"
+last_updated: "2026-04-16T12:56:57Z"
 progress:
   total_phases: 2
   completed_phases: 1
@@ -47,11 +47,11 @@ Phase 1: Foundation & Static Sections - 建立组件化基础设施
 ## Current Position
 
 Phase: 08 (optimize-cold-start-ux) — EXECUTING
-Plan: 1 of 2
-**Phase:** 07
-**Plan:** Not started
+Plan: 2 of 2
+**Phase:** 08
+**Plan:** 08-01 Complete (Profiling Infrastructure)
 
-**Status:** Executing Phase 08
+**Status:** Executing Phase 08, Plan 02 ready
 
 **Progress Bar:** ██████████ 100% (7/7 phases complete)
 
@@ -70,15 +70,19 @@ Plan: 1 of 2
 
 ### Last Action
 
-Completed quick task 260416-red: Tauri setupoverlay integration — replaced non-existent `app.setup_overlay()` with `WebviewWindowBuilder` in `.setup()` to show native overlay during Rust initialization.
+Completed plan 08-01: Profiling Infrastructure — added Rust startup profiling with [startup:profile] logs and frontend profiling with performance.now()
+
+Commits:
+- 099ff9a: feat(08-01): add Rust startup profiling with timing logs
+- 2da01d9: feat(08-01): add frontend startup profiling with performance.now()
 
 ### Next Step
 
-Phase 07 complete - both plans finished (07-01: overlay, 07-02: Rust events pre-executed)
+Phase 08-02: Startup speed optimization (profiling data now available)
 
 ### Active Work
 
-Phase 07 startup progress overlay complete.
+Phase 08-01 profiling infrastructure complete. Ready to analyze startup timings.
 
 ### Blockers
 

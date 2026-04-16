@@ -54,13 +54,13 @@
 **Goal:** Optimize cold startup user experience — improve startup speed, reduce perceived wait time, enhance brand impression during boot.
 **Requirements**: TBD
 **Depends on:** Phase 07
-**Plans:** 2/2 plans complete
+**Plans:** 1/2 complete
 
-**Status:** Complete
+**Status:** In Progress
 
 Plans:
 - [x] 08-01-PLAN.md — Speed profiling and measurement baseline
-- [x] 08-02-PLAN.md — Branded Splash Overlay Redesign
+- [ ] 08-02-PLAN.md — Startup speed optimization (pending)
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 9 to break down)
