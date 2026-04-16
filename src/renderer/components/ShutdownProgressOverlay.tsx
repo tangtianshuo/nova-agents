@@ -28,7 +28,7 @@ export default function ShutdownProgressOverlay({
   const [tip, setTip] = useState(SHUTDOWN_TIPS[0]);
   const startedRef = useRef(false);
   const startTimeRef = useRef<number | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tipIndexRef = useRef(0);
 
   const handleComplete = useCallback(() => {
@@ -51,7 +51,9 @@ export default function ShutdownProgressOverlay({
     startedRef.current = true;
     startTimeRef.current = Date.now();
 
-    const animate = () => {
+    // Use setInterval instead of requestAnimationFrame for reliability during window close
+    // requestAnimationFrame may stop firing when the window is being closed
+    intervalRef.current = setInterval(() => {
       const elapsed = Date.now() - (startTimeRef.current || Date.now());
       // 7 seconds total duration
       const totalDuration = 7000;
@@ -66,17 +68,16 @@ export default function ShutdownProgressOverlay({
         setTip(SHUTDOWN_TIPS[idx]);
       }
 
-      if (newProgress < 100) {
-        animationFrameRef.current = requestAnimationFrame(animate);
-      } else {
+      if (newProgress >= 100) {
+        // Animation completed - clear interval and call handleComplete
+        clearInterval(intervalRef.current!);
+        intervalRef.current = null;
         handleComplete();
       }
-    };
-
-    animationFrameRef.current = requestAnimationFrame(animate);
+    }, 50);
 
     return () => {
-      if (animationFrameRef.current) {
+      if (intervalRef.current) {
         // If we're being cleaned up but animation is near complete, call onComplete
         // This handles the case where App.tsx sets visible=false before we reach 100%
         const elapsed = Date.now() - (startTimeRef.current || Date.now());
@@ -85,8 +86,8 @@ export default function ShutdownProgressOverlay({
         if (currentProgress >= 99) {
           handleComplete();
         }
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
   }, [visible, handleComplete]);

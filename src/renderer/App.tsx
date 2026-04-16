@@ -1610,12 +1610,21 @@ export default function App() {
     updateReady,
     applyUpdateNow,
     beforeExit: async () => {
+      // Emit cleanup event (fire-and-forget, best effort)
+      // Rust handler will do cleanup and call app.exit(0)
+      const { emit } = await import('@tauri-apps/api/event');
+      emit('tray:confirm-exit').catch(() => {});
+
       // Show shutdown progress overlay and wait for completion
       setShowShutdownOverlay(true);
       // Wait for the overlay to complete (7 seconds animation)
       await new Promise<void>((resolve) => {
         shutdownCompleteRef.current = resolve;
       });
+
+      // Animation complete - directly call exit(0)
+      const { exit } = await import('@tauri-apps/plugin-process');
+      await exit(0);
     },
     onOpenSettings: () => handleOpenSettings('general'),
     onNavigateToTab: (tabId: string) => {

@@ -134,11 +134,12 @@ export function useTrayEvents(options: TrayEventsOptions) {
 
             if (canExit) {
               // Call beforeExit hook if provided (can show progress overlay)
+              // NOTE: beforeExit in App.tsx handles emit('tray:confirm-exit') and exit(0)
+              // We just wait for it to complete here
               if (beforeExit) {
                 await beforeExit();
               }
-              const { emit } = await import('@tauri-apps/api/event');
-              await emit('tray:confirm-exit');
+              // beforeExit() already called exit(0) - nothing more to do here
             }
           }
         });
@@ -180,11 +181,12 @@ export function useTrayEvents(options: TrayEventsOptions) {
 
           if (canExit) {
             // Call beforeExit hook if provided (can show progress overlay)
+            // NOTE: beforeExit in App.tsx handles emit('tray:confirm-exit') and exit(0)
+            // We just wait for it to complete here
             if (beforeExit) {
               await beforeExit();
             }
-            const { emit } = await import('@tauri-apps/api/event');
-            await emit('tray:confirm-exit');
+            // beforeExit() already called exit(0) - nothing more to do here
           }
         });
       } catch (error) {
