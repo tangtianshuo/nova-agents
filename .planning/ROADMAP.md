@@ -48,6 +48,19 @@
 
 **Status:** Planned
 
+### Phase 08: Optimize Cold Start UX
+
+**Goal:** Optimize cold startup user experience — improve startup speed, reduce perceived wait time, enhance brand impression during boot.
+**Requirements**: TBD
+**Depends on:** Phase 07
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 8 to break down)
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 9 to break down)
+
 ---
 
 *Archived milestone details: `.planning/milestones/v1.0-ROADMAP.md`*

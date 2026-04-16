@@ -231,4 +231,12 @@ All 27 v1 requirements mapped to phases in REQUIREMENTS.md traceability section.
 
 ---
 
+## Accumulated Context
+
+### Roadmap Evolution
+- Phase 08 added: Optimize Cold Start UX
+
+### Last Activity
+- Phase 08 context gathered: speed profiling + brand redesign + 4-stage progress with animations
+
 *State initialized: 2026-04-09*
