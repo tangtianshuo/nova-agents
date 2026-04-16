@@ -329,6 +329,19 @@ pub fn run() {
                 log::error!("[App] Failed to setup system tray: {}", e);
             }
 
+            // Emit startup stage 1 (System Core) after tray setup - deferred to async to ensure frontend is listening
+            let app_handle_for_s1 = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                // Small delay to ensure frontend webview has mounted and is listening
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                let _ = app_handle_for_s1.emit("startup:stage", serde_json::json!({
+                    "stage": 1,
+                    "name": "System Core",
+                    "status": "complete"
+                }));
+                log::info!("[App] Startup stage 1 (System Core) emitted");
+            });
+
             // Setup tray exit handler (for when user confirms exit from tray menu)
             let app_handle_for_tray = app.handle().clone();
             app.listen("tray:confirm-exit", move |_| {
@@ -372,17 +385,36 @@ pub fn run() {
             management_api::set_sidecar_state(sidecar_state_for_management);
 
             // Start management API (internal HTTP server for Bun→Rust IPC)
+            let app_for_mgmt = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 match management_api::start_management_api().await {
-                    Ok(port) => log::info!("[App] Management API started on port {}", port),
+                    Ok(port) => {
+                        log::info!("[App] Management API started on port {}", port);
+                        // Emit startup stage 2 (Tray & Management API)
+                        let _ = app_for_mgmt.emit("startup:stage", serde_json::json!({
+                            "stage": 2,
+                            "name": "Tray & Management API",
+                            "status": "complete"
+                        }));
+                        log::info!("[App] Startup stage 2 (Tray & Management API) emitted");
+                    }
                     Err(e) => log::error!("[App] Failed to start management API: {}", e),
                 }
             });
 
             // Initialize cron task manager with app handle
             let cron_app_handle = app.handle().clone();
+            let app_for_s3 = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 cron_task::initialize_cron_manager(cron_app_handle).await;
+                // Emit startup stage 3 (Scheduler & Monitors)
+                // Note: initialize_cron_manager emits cron:manager-ready internally
+                let _ = app_for_s3.emit("startup:stage", serde_json::json!({
+                    "stage": 3,
+                    "name": "Scheduler & Monitors",
+                    "status": "complete"
+                }));
+                log::info!("[App] Startup stage 3 (Scheduler & Monitors) emitted");
             });
             ulog_info!("[App] Cron task manager initialization scheduled");
 
