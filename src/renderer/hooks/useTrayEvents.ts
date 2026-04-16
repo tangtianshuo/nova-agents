@@ -8,6 +8,10 @@ import { setWindowVisible, consumePendingNavigation } from '@/services/notificat
 interface TrayEventsOptions {
   /** Whether minimize to tray is enabled */
   minimizeToTray: boolean;
+  /** Whether an update has been downloaded and is ready to install */
+  updateReady?: boolean;
+  /** Callback to trigger update restart immediately */
+  applyUpdateNow?: () => void;
   /** Callback when settings should be opened */
   onOpenSettings?: () => void;
   /** Callback when exit is requested (for confirmation if cron tasks are running) */
@@ -103,7 +107,14 @@ export function useTrayEvents(options: TrayEventsOptions) {
         // Listen for window close request (X button)
         unlistenCloseRequested = await listen('window:close-requested', async () => {
           console.log('[useTrayEvents] Window close requested');
-          const { minimizeToTray } = optionsRef.current;
+          const { minimizeToTray, updateReady, applyUpdateNow } = optionsRef.current;
+
+          // If update is ready, always trigger update restart regardless of minimizeToTray
+          if (updateReady) {
+            console.log('[useTrayEvents] Update ready, triggering update restart');
+            applyUpdateNow?.();
+            return;
+          }
 
           if (minimizeToTray) {
             // Hide to tray instead of closing
@@ -138,7 +149,14 @@ export function useTrayEvents(options: TrayEventsOptions) {
 
         // Listen for tray "exit" menu click (also triggered by CustomTitleBar close button on Windows)
         unlistenExitRequested = await listen('tray:exit-requested', async () => {
-          const { minimizeToTray, onExitRequested } = optionsRef.current;
+          const { minimizeToTray, updateReady, applyUpdateNow, onExitRequested } = optionsRef.current;
+
+          // If update is ready, always trigger update restart regardless of minimizeToTray
+          if (updateReady) {
+            console.log('[useTrayEvents] Update ready (tray:exit), triggering update restart');
+            applyUpdateNow?.();
+            return;
+          }
 
           // If minimize to tray is enabled, hide window instead of exiting
           if (minimizeToTray) {

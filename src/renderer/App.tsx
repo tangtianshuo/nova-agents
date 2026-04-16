@@ -1601,6 +1601,8 @@ export default function App() {
   // System tray event handling (minimize to tray, exit confirmation)
   useTrayEvents({
     minimizeToTray: config.minimizeToTray,
+    updateReady,
+    applyUpdateNow,
     onOpenSettings: () => handleOpenSettings('general'),
     onNavigateToTab: (tabId: string) => {
       // Verify the tab still exists before switching
@@ -1630,10 +1632,6 @@ export default function App() {
 
       // No running tasks, allow exit
       return true;
-    },
-    onDeferredExitRequested: () => {
-      // Deferred update is scheduled - show overlay with real progress
-      void applyUpdateNow();
     },
   });
 
