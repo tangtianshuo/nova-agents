@@ -6,8 +6,6 @@ import { stopTabSidecar, startGlobalSidecar, initGlobalSidecarReadyPromise, mark
 import ConfirmDialog from '@/components/ConfirmDialog';
 import BugReportOverlay from '@/components/BugReportOverlay';
 import UpdateRestartOverlay, { type UpdateRestartOverlayHandle } from '@/components/UpdateRestartOverlay';
-import StartupProgressOverlay from '@/components/StartupProgressOverlay';
-import { useStartupProgress } from '@/hooks/useStartupProgress';
 import ShutdownProgressOverlay from '@/components/ShutdownProgressOverlay';
 import CustomTitleBar from '@/components/CustomTitleBar';
 import TabBar from '@/components/TabBar';
@@ -267,7 +265,6 @@ export default function App() {
   const shutdownCompleteRef = useRef<(() => void) | null>(null);
 
   // Startup progress overlay state
-  const startupProgress = useStartupProgress();
 
   // Register callbacks with useUpdater
   useEffect(() => {
@@ -1889,15 +1886,6 @@ export default function App() {
             }}
           />
         )}
-
-        {/* Startup progress overlay - shows progress during app boot */}
-        <StartupProgressOverlay
-          visible={startupProgress.isVisible}
-          onComplete={() => {
-            // Startup complete - hook has already set isVisible=false
-            console.log('[App] Startup progress complete');
-          }}
-        />
 
         {/* Shutdown progress overlay - shows progress when closing app */}
         <ShutdownProgressOverlay
