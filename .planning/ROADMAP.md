@@ -33,6 +33,7 @@
 | 5. Auto Update Optimization | v1.0 | 1/1 | Complete | 2026-04-16 |
 | 6. Shutdown Progress Overlay | v1.0 | 1/1 | Complete | 2026-04-16 |
 | 7. Startup Progress Bar | v1.0 | 2/2 | Complete   | 2026-04-16 |
+| 8. Optimize Cold Start UX | v1.0 | 2/2 | Complete   | 2026-04-16 |
 
 ---
 
@@ -53,10 +54,13 @@
 **Goal:** Optimize cold startup user experience — improve startup speed, reduce perceived wait time, enhance brand impression during boot.
 **Requirements**: TBD
 **Depends on:** Phase 07
-**Plans:** 0 plans
+**Plans:** 2/2 plans complete
+
+**Status:** Complete
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 8 to break down)
+- [x] 08-01-PLAN.md — Speed profiling and measurement baseline
+- [x] 08-02-PLAN.md — Branded Splash Overlay Redesign
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 9 to break down)
