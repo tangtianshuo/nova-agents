@@ -249,7 +249,7 @@ pub fn run() {
             commands::cmd_hide_overlay,
         ])
         .setup(|app| {
-            // Create main window FIRST (hidden) — it will be shown when frontend is ready
+            // Create main window (hidden) — shown when overlay dismisses
             use tauri::WebviewWindowBuilder;
             match WebviewWindowBuilder::new(
                 app,
@@ -263,7 +263,7 @@ pub fn run() {
             .center()
             .decorations(true)
             .transparent(true)
-            .visible(false) // Hidden initially — shown when frontend is ready
+            .visible(false)
             .build()
             {
                 Ok(_) => log::info!("[App] Main window created (hidden)"),
@@ -271,12 +271,13 @@ pub fn run() {
             }
 
             // Show native overlay during Rust initialization (before main window content).
-            // The overlay appears immediately and stays on top until frontend signals ready.
+            // Using data URL avoids any network/dev-server loading delay.
             // Frontend dismisses it via cmd_hide_overlay after startup:complete is emitted.
+            let splash_html = r#"data:text/html,<html><head><style>body{margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#faf6ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}h1{font-size:36px;font-weight:300;color:#1c1612;letter-spacing:-0.02em}.spinner{width:32px;height:32px;border:2px solid #e8dccf;border-top-color:#c26d3a;border-radius:50%;margin-top:24px;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><h1>nova-agents</h1><div class=spinner></div></body></html>"#;
             match WebviewWindowBuilder::new(
                 app,
                 "overlay",
-                tauri::WebviewUrl::App("splash.html".into()),
+                tauri::WebviewUrl::External(splash_html.parse().unwrap()),
             )
             .decorations(false)
             .always_on_top(true)
