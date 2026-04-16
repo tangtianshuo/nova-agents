@@ -14,8 +14,6 @@ interface TrayEventsOptions {
   onExitRequested?: () => Promise<boolean>;
   /** Callback when notification click triggers navigation to a specific tab */
   onNavigateToTab?: (tabId: string) => void;
-  /** Callback when deferred update is scheduled and exit is requested - handles its own exit flow */
-  onDeferredExitRequested?: () => void;
 }
 
 export function useTrayEvents(options: TrayEventsOptions) {
@@ -105,22 +103,15 @@ export function useTrayEvents(options: TrayEventsOptions) {
         // Listen for window close request (X button)
         unlistenCloseRequested = await listen('window:close-requested', async () => {
           console.log('[useTrayEvents] Window close requested');
-          const { minimizeToTray, onDeferredExitRequested } = optionsRef.current;
+          const { minimizeToTray } = optionsRef.current;
 
           if (minimizeToTray) {
             // Hide to tray instead of closing
-            const window = getCurrentWindow();
             await window.hide();
             wasHidden = true;
-            setWindowVisible(false); // Update notification service state
+            setWindowVisible(false);
             console.log('[useTrayEvents] Window hidden to tray');
           } else {
-            // Check if deferred exit is scheduled first
-            if (onDeferredExitRequested) {
-              onDeferredExitRequested();
-              return; // Don't emit confirm-exit - let deferred handler manage exit
-            }
-
             // Check if exit callback returns true (can exit)
             const { onExitRequested } = optionsRef.current;
             if (onExitRequested) {
@@ -145,18 +136,20 @@ export function useTrayEvents(options: TrayEventsOptions) {
           }
         });
 
-        // Listen for tray "exit" menu click
+        // Listen for tray "exit" menu click (also triggered by CustomTitleBar close button on Windows)
         unlistenExitRequested = await listen('tray:exit-requested', async () => {
-          console.log('[useTrayEvents] Exit requested from tray');
-          const { onDeferredExitRequested } = optionsRef.current;
+          const { minimizeToTray, onExitRequested } = optionsRef.current;
 
-          // Check if deferred exit is scheduled first
-          if (onDeferredExitRequested) {
-            onDeferredExitRequested();
-            return; // Don't emit confirm-exit - let deferred handler manage exit
+          // If minimize to tray is enabled, hide window instead of exiting
+          if (minimizeToTray) {
+            await window.hide();
+            wasHidden = true;
+            setWindowVisible(false);
+            console.log('[useTrayEvents] Window hidden to tray (from tray:exit-requested)');
+            return;
           }
 
-          const { onExitRequested } = optionsRef.current;
+          // Check if exit callback returns true (can exit)
           if (onExitRequested) {
             const canExit = await onExitRequested();
             if (canExit) {
@@ -168,8 +161,6 @@ export function useTrayEvents(options: TrayEventsOptions) {
             await emit('tray:confirm-exit');
           }
         });
-
-        console.log('[useTrayEvents] Event listeners setup complete');
       } catch (error) {
         console.error('[useTrayEvents] Failed to setup listeners:', error);
       }
