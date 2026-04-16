@@ -6,6 +6,7 @@ import { stopTabSidecar, startGlobalSidecar, initGlobalSidecarReadyPromise, mark
 import ConfirmDialog from '@/components/ConfirmDialog';
 import BugReportOverlay from '@/components/BugReportOverlay';
 import UpdateRestartOverlay, { type UpdateRestartOverlayHandle } from '@/components/UpdateRestartOverlay';
+import ShutdownProgressOverlay from '@/components/ShutdownProgressOverlay';
 import CustomTitleBar from '@/components/CustomTitleBar';
 import TabBar from '@/components/TabBar';
 import TabProvider from '@/context/TabProvider';
@@ -257,6 +258,11 @@ export default function App() {
   const [showUpdateRestartOverlay, setShowUpdateRestartOverlay] = useState(false);
   // Ref to control UpdateRestartOverlay progress
   const updateOverlayRef = useRef<UpdateRestartOverlayHandle | null>(null);
+
+  // Shutdown progress overlay state
+  const [showShutdownOverlay, setShowShutdownOverlay] = useState(false);
+  // Ref to store shutdown completion callback (for beforeExit promise)
+  const shutdownCompleteRef = useRef<(() => void) | null>(null);
 
   // Register callbacks with useUpdater
   useEffect(() => {
@@ -1603,6 +1609,14 @@ export default function App() {
     minimizeToTray: config.minimizeToTray,
     updateReady,
     applyUpdateNow,
+    beforeExit: async () => {
+      // Show shutdown progress overlay and wait for completion
+      setShowShutdownOverlay(true);
+      // Wait for the overlay to complete (7 seconds animation)
+      await new Promise<void>((resolve) => {
+        shutdownCompleteRef.current = resolve;
+      });
+    },
     onOpenSettings: () => handleOpenSettings('general'),
     onNavigateToTab: (tabId: string) => {
       // Verify the tab still exists before switching
@@ -1853,6 +1867,19 @@ export default function App() {
             onComplete={() => {
               // Restart is handled by applyUpdateNow with progress updates
               // This is called only if app hasn't exited (shouldn't happen in practice)
+            }}
+          />
+        )}
+
+        {/* Shutdown progress overlay - shows progress when closing app */}
+        {showShutdownOverlay && (
+          <ShutdownProgressOverlay
+            visible={showShutdownOverlay}
+            onComplete={() => {
+              // Resolve the beforeExit promise to trigger actual exit
+              shutdownCompleteRef.current?.();
+              shutdownCompleteRef.current = null;
+              setShowShutdownOverlay(false);
             }}
           />
         )}

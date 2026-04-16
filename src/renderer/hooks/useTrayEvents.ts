@@ -12,6 +12,8 @@ interface TrayEventsOptions {
   updateReady?: boolean;
   /** Callback to trigger update restart immediately */
   applyUpdateNow?: () => void;
+  /** Callback before exit (can show progress overlay, returns promise that resolves when ready to exit) */
+  beforeExit?: () => Promise<void>;
   /** Callback when settings should be opened */
   onOpenSettings?: () => void;
   /** Callback when exit is requested (for confirmation if cron tasks are running) */
@@ -107,7 +109,7 @@ export function useTrayEvents(options: TrayEventsOptions) {
         // Listen for window close request (X button)
         unlistenCloseRequested = await listen('window:close-requested', async () => {
           console.log('[useTrayEvents] Window close requested');
-          const { minimizeToTray, updateReady, applyUpdateNow } = optionsRef.current;
+          const { minimizeToTray, updateReady, applyUpdateNow, beforeExit } = optionsRef.current;
 
           // If update is ready, always trigger update restart regardless of minimizeToTray
           if (updateReady) {
@@ -125,13 +127,16 @@ export function useTrayEvents(options: TrayEventsOptions) {
           } else {
             // Check if exit callback returns true (can exit)
             const { onExitRequested } = optionsRef.current;
+            let canExit = true;
             if (onExitRequested) {
-              const canExit = await onExitRequested();
-              if (canExit) {
-                const { emit } = await import('@tauri-apps/api/event');
-                await emit('tray:confirm-exit');
+              canExit = await onExitRequested();
+            }
+
+            if (canExit) {
+              // Call beforeExit hook if provided (can show progress overlay)
+              if (beforeExit) {
+                await beforeExit();
               }
-            } else {
               const { emit } = await import('@tauri-apps/api/event');
               await emit('tray:confirm-exit');
             }
@@ -149,7 +154,7 @@ export function useTrayEvents(options: TrayEventsOptions) {
 
         // Listen for tray "exit" menu click (also triggered by CustomTitleBar close button on Windows)
         unlistenExitRequested = await listen('tray:exit-requested', async () => {
-          const { minimizeToTray, updateReady, applyUpdateNow, onExitRequested } = optionsRef.current;
+          const { minimizeToTray, updateReady, applyUpdateNow, beforeExit, onExitRequested } = optionsRef.current;
 
           // If update is ready, always trigger update restart regardless of minimizeToTray
           if (updateReady) {
@@ -168,13 +173,16 @@ export function useTrayEvents(options: TrayEventsOptions) {
           }
 
           // Check if exit callback returns true (can exit)
+          let canExit = true;
           if (onExitRequested) {
-            const canExit = await onExitRequested();
-            if (canExit) {
-              const { emit } = await import('@tauri-apps/api/event');
-              await emit('tray:confirm-exit');
+            canExit = await onExitRequested();
+          }
+
+          if (canExit) {
+            // Call beforeExit hook if provided (can show progress overlay)
+            if (beforeExit) {
+              await beforeExit();
             }
-          } else {
             const { emit } = await import('@tauri-apps/api/event');
             await emit('tray:confirm-exit');
           }
