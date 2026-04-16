@@ -646,7 +646,7 @@ Section GitForWindows
         Delete "$TEMP\Git-Installer.exe"
         DetailPrint "$(gitInstalling)"
         ; Path relative from build dir (target/x86_64-pc-windows-msvc/release/nsis/x64/) to source (src-tauri/nsis/)
-        File "/oname=$TEMP\Git-Installer.exe" "..\..\..\..\..\nsis\Git-Installer.exe"
+        File "/oname=$TEMP\Git-Installer.exe" "D:\Projects\Tauri\nova-agents\src-tauri\nsis\Git-Installer.exe"
 
         ; Install Git silently
         ; /VERYSILENT - No user interaction
