@@ -1872,17 +1872,18 @@ export default function App() {
         )}
 
         {/* Shutdown progress overlay - shows progress when closing app */}
-        {showShutdownOverlay && (
-          <ShutdownProgressOverlay
-            visible={showShutdownOverlay}
-            onComplete={() => {
-              // Resolve the beforeExit promise to trigger actual exit
-              shutdownCompleteRef.current?.();
-              shutdownCompleteRef.current = null;
+        <ShutdownProgressOverlay
+          visible={showShutdownOverlay}
+          onComplete={() => {
+            // First resolve the promise to trigger actual exit
+            shutdownCompleteRef.current?.();
+            shutdownCompleteRef.current = null;
+            // Small delay before hiding overlay to ensure exit is triggered
+            setTimeout(() => {
               setShowShutdownOverlay(false);
-            }}
-          />
-        )}
+            }, 100);
+          }}
+        />
       </div>
     </AuthProvider>
   );

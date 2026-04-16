@@ -77,7 +77,16 @@ export default function ShutdownProgressOverlay({
 
     return () => {
       if (animationFrameRef.current) {
+        // If we're being cleaned up but animation is near complete, call onComplete
+        // This handles the case where App.tsx sets visible=false before we reach 100%
+        const elapsed = Date.now() - (startTimeRef.current || Date.now());
+        const totalDuration = 7000;
+        const currentProgress = Math.min(100, (elapsed / totalDuration) * 100);
+        if (currentProgress >= 99) {
+          handleComplete();
+        }
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
     };
   }, [visible, handleComplete]);
