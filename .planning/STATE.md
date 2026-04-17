@@ -65,17 +65,15 @@ Plan: 2 of 2
 |---|-------------|------|--------|-----------|
 | 260416-red | 使用tauri2 setupoverlay 注册启动页 | 2026-04-16 | c4fb65d | [260416-red-tauri2-setupoverlay](./quick/260416-red-tauri2-setupoverlay/) |
 | 260416-roc | 移除 React StartupProgressOverlay 组件 | 2026-04-16 | 2994e42 | [260416-roc-react-startupprogressoverlay](./quick/260416-roc-react-startupprogressoverlay/) |
+| 260417-elt | 修复启动页 overlay 窗口尺寸/居中/可见性配置 | 2026-04-17 | 0016d67 | [260417-elt](./quick/260417-elt/) |
 
 ---
 
 ### Last Action
 
-Completed plan 08-01: Profiling Infrastructure — added Rust startup profiling with [startup:profile] logs and frontend profiling with performance.now()
+Completed quick task 260417-elt: Fix startup splash overlay — added explicit inner_size(400x300), center(), and visible(true) to overlay WebviewWindowBuilder.
 
-Commits:
-
-- 099ff9a: feat(08-01): add Rust startup profiling with timing logs
-- 2da01d9: feat(08-01): add frontend startup profiling with performance.now()
+Commit: 0016d67
 
 ### Next Step
 
