@@ -8,14 +8,18 @@ import { setWindowVisible, consumePendingNavigation } from '@/services/notificat
 interface TrayEventsOptions {
   /** Whether minimize to tray is enabled */
   minimizeToTray: boolean;
+  /** Whether an update has been downloaded and is ready to install */
+  updateReady?: boolean;
+  /** Callback to trigger update restart immediately */
+  applyUpdateNow?: () => void;
+  /** Callback before exit (can show progress overlay, returns promise that resolves when ready to exit) */
+  beforeExit?: () => Promise<void>;
   /** Callback when settings should be opened */
   onOpenSettings?: () => void;
   /** Callback when exit is requested (for confirmation if cron tasks are running) */
   onExitRequested?: () => Promise<boolean>;
   /** Callback when notification click triggers navigation to a specific tab */
   onNavigateToTab?: (tabId: string) => void;
-  /** Callback when deferred update is scheduled and exit is requested - handles its own exit flow */
-  onDeferredExitRequested?: () => void;
 }
 
 export function useTrayEvents(options: TrayEventsOptions) {
@@ -105,33 +109,37 @@ export function useTrayEvents(options: TrayEventsOptions) {
         // Listen for window close request (X button)
         unlistenCloseRequested = await listen('window:close-requested', async () => {
           console.log('[useTrayEvents] Window close requested');
-          const { minimizeToTray, onDeferredExitRequested } = optionsRef.current;
+          const { minimizeToTray, updateReady, applyUpdateNow, beforeExit } = optionsRef.current;
+
+          // If update is ready, always trigger update restart regardless of minimizeToTray
+          if (updateReady) {
+            console.log('[useTrayEvents] Update ready, triggering update restart');
+            applyUpdateNow?.();
+            return;
+          }
 
           if (minimizeToTray) {
             // Hide to tray instead of closing
-            const window = getCurrentWindow();
             await window.hide();
             wasHidden = true;
-            setWindowVisible(false); // Update notification service state
+            setWindowVisible(false);
             console.log('[useTrayEvents] Window hidden to tray');
           } else {
-            // Check if deferred exit is scheduled first
-            if (onDeferredExitRequested) {
-              onDeferredExitRequested();
-              return; // Don't emit confirm-exit - let deferred handler manage exit
-            }
-
             // Check if exit callback returns true (can exit)
             const { onExitRequested } = optionsRef.current;
+            let canExit = true;
             if (onExitRequested) {
-              const canExit = await onExitRequested();
-              if (canExit) {
-                const { emit } = await import('@tauri-apps/api/event');
-                await emit('tray:confirm-exit');
+              canExit = await onExitRequested();
+            }
+
+            if (canExit) {
+              // Call beforeExit hook if provided (can show progress overlay)
+              // NOTE: beforeExit in App.tsx handles emit('tray:confirm-exit') and exit(0)
+              // We just wait for it to complete here
+              if (beforeExit) {
+                await beforeExit();
               }
-            } else {
-              const { emit } = await import('@tauri-apps/api/event');
-              await emit('tray:confirm-exit');
+              // beforeExit() already called exit(0) - nothing more to do here
             }
           }
         });
@@ -145,31 +153,42 @@ export function useTrayEvents(options: TrayEventsOptions) {
           }
         });
 
-        // Listen for tray "exit" menu click
+        // Listen for tray "exit" menu click (also triggered by CustomTitleBar close button on Windows)
         unlistenExitRequested = await listen('tray:exit-requested', async () => {
-          console.log('[useTrayEvents] Exit requested from tray');
-          const { onDeferredExitRequested } = optionsRef.current;
+          const { minimizeToTray, updateReady, applyUpdateNow, beforeExit, onExitRequested } = optionsRef.current;
 
-          // Check if deferred exit is scheduled first
-          if (onDeferredExitRequested) {
-            onDeferredExitRequested();
-            return; // Don't emit confirm-exit - let deferred handler manage exit
+          // If update is ready, always trigger update restart regardless of minimizeToTray
+          if (updateReady) {
+            console.log('[useTrayEvents] Update ready (tray:exit), triggering update restart');
+            applyUpdateNow?.();
+            return;
           }
 
-          const { onExitRequested } = optionsRef.current;
+          // If minimize to tray is enabled, hide window instead of exiting
+          if (minimizeToTray) {
+            await window.hide();
+            wasHidden = true;
+            setWindowVisible(false);
+            console.log('[useTrayEvents] Window hidden to tray (from tray:exit-requested)');
+            return;
+          }
+
+          // Check if exit callback returns true (can exit)
+          let canExit = true;
           if (onExitRequested) {
-            const canExit = await onExitRequested();
-            if (canExit) {
-              const { emit } = await import('@tauri-apps/api/event');
-              await emit('tray:confirm-exit');
+            canExit = await onExitRequested();
+          }
+
+          if (canExit) {
+            // Call beforeExit hook if provided (can show progress overlay)
+            // NOTE: beforeExit in App.tsx handles emit('tray:confirm-exit') and exit(0)
+            // We just wait for it to complete here
+            if (beforeExit) {
+              await beforeExit();
             }
-          } else {
-            const { emit } = await import('@tauri-apps/api/event');
-            await emit('tray:confirm-exit');
+            // beforeExit() already called exit(0) - nothing more to do here
           }
         });
-
-        console.log('[useTrayEvents] Event listeners setup complete');
       } catch (error) {
         console.error('[useTrayEvents] Failed to setup listeners:', error);
       }

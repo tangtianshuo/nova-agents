@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { relaunch } from '@tauri-apps/plugin-process';
+import { relaunch, exit } from '@tauri-apps/plugin-process';
 
 import { track } from '@/analytics';
 import { isTauriEnvironment } from '@/utils/browserMock';
@@ -272,22 +272,31 @@ export function useUpdater(): UseUpdaterResult {
             } catch (err) {
                 const errStr = String(err);
                 if (errStr.includes('VERSION_MISMATCH')) {
-                    console.warn('[useUpdater] Pending update version mismatch, will re-download');
+                    // No pending update on disk (stale or already installed) — exit directly
+                    console.warn('[useUpdater] No pending update found, exiting directly');
                     setUpdateReady(false);
                     setUpdateVersion(null);
                     setPendingUpdateOnStartup(null);
-                    updateProgress(0, '版本不匹配，正在重新下载...');
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    void invoke('check_and_download_update');
+                    setDeferUpdateScheduled(false);
                 } else if (errStr.includes('NETWORK_ERROR')) {
-                    console.warn('[useUpdater] Network required to verify update');
-                    updateProgress(50, '网络错误，请检查网络连接');
+                    // Can't verify update — exit directly to avoid blocking user
+                    console.warn('[useUpdater] Network error verifying update, exiting directly');
+                    setDeferUpdateScheduled(false);
                 } else {
                     console.error('[useUpdater] install_pending_update failed:', err);
-                    updateProgress(50, '安装失败');
+                    setDeferUpdateScheduled(false);
                 }
+                // Exit the app since update cannot proceed
+                // Use window close as fallback since we already cleaned up processes
+                try {
+                    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+                    await getCurrentWindow().close();
+                } catch {
+                    // If window close fails, use process exit
+                    await exit(0);
+                }
+                return;
             }
-            return;
         }
 
         // macOS: relaunch
@@ -300,6 +309,14 @@ export function useUpdater(): UseUpdaterResult {
                 await invoke('restart_app');
             } catch (e) {
                 console.error('[useUpdater] Rust restart also failed:', e);
+                // Both restart methods failed — exit directly
+                setDeferUpdateScheduled(false);
+                try {
+                    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+                    await getCurrentWindow().close();
+                } catch {
+                    await exit(0);
+                }
             }
         }
     }, []);

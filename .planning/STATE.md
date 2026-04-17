@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-last_updated: "2026-04-12T01:20:20.573Z"
+last_updated: "2026-04-16T13:01:00.575Z"
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 17
-  completed_plans: 18
+  total_phases: 2
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
 ---
 
 # Settings Componentization - Project State
@@ -46,28 +46,42 @@ Phase 1: Foundation & Static Sections - 建立组件化基础设施
 
 ## Current Position
 
-**Phase:** 04
+Phase: 08 (optimize-cold-start-ux) — EXECUTING
+Plan: 2 of 2
+**Phase:** 08
 **Plan:** Not started
 
-**Status:** v1.0 milestone complete
+**Status:** Milestone complete
 
-**Progress Bar:** ██████████ 100% (4/4 phases complete)
+**Progress Bar:** ██████████ 100% (7/7 phases complete)
 
 ---
 
 ## Session Continuity
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260416-red | 使用tauri2 setupoverlay 注册启动页 | 2026-04-16 | c4fb65d | [260416-red-tauri2-setupoverlay](./quick/260416-red-tauri2-setupoverlay/) |
+| 260416-roc | 移除 React StartupProgressOverlay 组件 | 2026-04-16 | 2994e42 | [260416-roc-react-startupprogressoverlay](./quick/260416-roc-react-startupprogressoverlay/) |
+| 260417-elt | 修复启动页 overlay 窗口尺寸/居中/可见性配置 | 2026-04-17 | 0016d67 | [260417-elt](./quick/260417-elt/) |
+
+---
+
 ### Last Action
 
-Completed Phase 04-06 execution. Quality verification complete: TypeScript/ESLint pass, all Props interfaces documented, all files under 500 lines.
+Completed quick task 260417-elt: Fix startup splash overlay — added explicit inner_size(400x300), center(), and visible(true) to overlay WebviewWindowBuilder.
+
+Commit: 0016d67
 
 ### Next Step
 
-Project complete - all 18 plans across 4 phases finished.
+Phase 08-02: Startup speed optimization (profiling data now available)
 
 ### Active Work
 
-Phase 04-06 (Quality Verification) complete. All QA requirements met (QA-01 through QA-06).
+Phase 08-01 profiling infrastructure complete. Ready to analyze startup timings.
 
 ### Blockers
 
@@ -219,5 +233,15 @@ All 27 v1 requirements mapped to phases in REQUIREMENTS.md traceability section.
 - Form validation patterns for custom dialogs (before Phase 4)
 
 ---
+
+## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 08 added: Optimize Cold Start UX
+
+### Last Activity
+
+- Phase 08 context gathered: speed profiling + brand redesign + 4-stage progress with animations
 
 *State initialized: 2026-04-09*

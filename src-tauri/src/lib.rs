@@ -36,6 +36,7 @@ use sidecar::{
 };
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::time::Instant;
 use tauri::{Emitter, Listener, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 
@@ -245,8 +246,56 @@ pub fn run() {
             commands::cmd_write_workspace_file,
             commands::cmd_read_file_base64,
             commands::cmd_open_file,
+            // Overlay window command
+            commands::cmd_hide_overlay,
         ])
         .setup(|app| {
+            // Startup profiling - track time to each stage milestone
+            let startup_timer = Instant::now();
+
+            // Create main window (hidden) — shown when overlay dismisses
+            use tauri::WebviewWindowBuilder;
+            match WebviewWindowBuilder::new(
+                app,
+                "main",
+                tauri::WebviewUrl::App("index.html".into()),
+            )
+            .title("NovaAgents")
+            .inner_size(1200.0, 800.0)
+            .min_inner_size(800.0, 600.0)
+            .resizable(true)
+            .center()
+            .decorations(true)
+            .transparent(true)
+            .visible(false)
+            .build()
+            {
+                Ok(_) => log::info!("[App] Main window created (hidden)"),
+                Err(e) => log::warn!("[App] Failed to create main window: {}", e),
+            }
+
+            // Show native overlay during Rust initialization (before main window content).
+            // Using data URL avoids any network/dev-server loading delay.
+            // Frontend dismisses it via cmd_hide_overlay after startup:complete is emitted.
+            let splash_html = r#"data:text/html,<html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#faf6ee;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}@media(prefers-color-scheme:dark){body{background:#1c1612}}@media(prefers-color-scheme:dark){.brand,.slogan,.version{color:#faf6ee!important;text-shadow:none!important}}@media(prefers-color-scheme:dark){.track{fill:#3a3532!important}}@media(prefers-color-scheme:dark){.fill{fill:#c26d3a!important}}.brand{font-size:36px;font-weight:300;color:#1c1612;letter-spacing:-0.02em;opacity:0;animation:brandIn .8s ease-out 0ms forwards}@keyframes brandIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}.slogan{font-size:14px;color:#6f6156;letter-spacing:.08em;opacity:0;animation:brandIn .8s ease-out 150ms forwards}.version{font-size:11px;color:#a69a90;opacity:0;animation:brandIn .8s ease-out 250ms forwards}.track{opacity:0;animation:brandIn .8s ease-out 350ms forwards}.spinner{opacity:0;animation:brandIn .8s ease-out 500ms forwards}@keyframes spin{to{transform:rotate(360deg)}}.spinner circle{animation:spin 1s linear infinite;transform-origin:50%}.stages{margin-top:32px;opacity:0;animation:brandIn .8s ease-out 400ms forwards}.stage{display:flex;flex-direction:column;align-items:center;gap:6px}.stage-dot{width:10px;height:10px;border-radius:50%;background:#e8dccf;transition:background .3s ease}.stage-line{width:48px;height:2px;background:#e8dccf;margin-top:5px}.stage-label{font-size:11px;color:#a69a90;white-space:nowrap}@media(prefers-color-scheme:dark){.stage-dot{background:#3a3532!important}}@media(prefers-color-scheme:dark){.stage-line{background:#3a3532!important}}@media(prefers-color-scheme:dark){.stage-label{color:#6f6156!important}}</style></head><body><div class=brand>nova-agents</div><div class=slogan>一念既起，诸事皆成</div><div class=version>v0.2.2</div><div class=stages><svg width=320 height=40 viewBox="0 0 320 40"><g class=spinner><circle cx=20 cy=20 r=8 fill=none stroke=#e8dccf stroke-width=2></circle><circle cx=20 cy=20 r=8 fill=none stroke=#c26d3a stroke-width=2 stroke-dasharray=25 50 stroke-linecap=round></circle></g><g class=spinner style="animation-delay:.1s"><circle cx=107 cy=20 r=8 fill=none stroke=#e8dccf stroke-width=2></circle><circle cx=107 cy=20 r=8 fill=none stroke=#c26d3a stroke-width=2 stroke-dasharray=25 50 stroke-linecap=round></circle></g><g class=spinner style="animation-delay:.2s"><circle cx=194 cy=20 r=8 fill=none stroke=#e8dccf stroke-width=2></circle><circle cx=194 cy=20 r=8 fill=none stroke=#c26d3a stroke-width=2 stroke-dasharray=25 50 stroke-linecap=round></circle></g><g class=spinner style="animation-delay:.3s"><circle cx=281 cy=20 r=8 fill=none stroke=#e8dccf stroke-width=2></circle><circle cx=281 cy=20 r=8 fill=none stroke=#c26d3a stroke-width=2 stroke-dasharray=25 50 stroke-linecap=round></circle></g><line x1=28 y1=20 x2=99 y2=20 stroke=#e8dccf stroke-width=2></line><line x1=115 y1=20 x2=186 y2=20 stroke=#e8dccf stroke-width=2></line><line x1=202 y1=20 x2=273 y2=20 stroke=#e8dccf stroke-width=2></line></svg><div style="display:flex;gap:32px;margin-top:8px;padding:0 12px"><div class=stage style="width:40px;text-align:center"><span class=stage-label>System<br>Core</span></div><div class=stage style="width:40px;text-align:center"><span class=stage-label>Tray &<br>API</span></div><div class=stage style="width:40px;text-align:center"><span class=stage-label>Scheduler &<br>Monitors</span></div><div class=stage style="width:40px;text-align:center"><span class=stage-label>Sidecar<br>Ready</span></div></div></div></body></html>"#;
+            match WebviewWindowBuilder::new(
+                app,
+                "overlay",
+                tauri::WebviewUrl::External(splash_html.parse().unwrap()),
+            )
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .transparent(true)
+            .inner_size(400.0, 300.0)
+            .center()
+            .visible(true)
+            .build()
+            {
+                Ok(_) => log::info!("[App] Native overlay shown during initialization"),
+                Err(e) => log::warn!("[App] Failed to create overlay window: {}", e),
+            }
+
             // Initialize logging FIRST — acquire_lock() and cleanup_stale_sidecars()
             // need a logger backend for their log::warn!/info! calls.
             use tauri_plugin_log::{Target, TargetKind};
@@ -329,12 +378,41 @@ pub fn run() {
                 log::error!("[App] Failed to setup system tray: {}", e);
             }
 
+            // Emit startup stage 1 (System Core) after tray setup - deferred to async to ensure frontend is listening
+            let app_handle_for_s1 = app.handle().clone();
+            let startup_timer_for_s1 = startup_timer;
+            tauri::async_runtime::spawn(async move {
+                // Small delay to ensure frontend webview has mounted and is listening
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                let elapsed = startup_timer_for_s1.elapsed().as_millis();
+                ulog_info!("[startup:profile] stage=1 name=SystemCore elapsed={}ms", elapsed);
+                let _ = app_handle_for_s1.emit("startup:stage", serde_json::json!({
+                    "stage": 1,
+                    "name": "System Core",
+                    "status": "complete",
+                    "elapsed_ms": elapsed
+                }));
+                log::info!("[App] Startup stage 1 (System Core) emitted");
+            });
+
             // Setup tray exit handler (for when user confirms exit from tray menu)
             let app_handle_for_tray = app.handle().clone();
             app.listen("tray:confirm-exit", move |_| {
                 log::info!("[App] Tray exit confirmed by user");
                 use std::sync::atomic::Ordering::Relaxed;
                 if !cleanup_done_for_tray_exit.swap(true, Relaxed) {
+                    // Check for pending update or new version before cleanup.
+                    // If update is triggered, shutdown_for_update stops sidecars cleanly
+                    // and NSIS handles the restart — we don't run normal cleanup.
+                    let app_clone = app_handle_for_tray.clone();
+                    let update_triggered = tauri::async_runtime::block_on(
+                        updater::exit_with_update_if_needed(&app_clone),
+                    );
+                    if update_triggered {
+                        // NSIS installer called exit(0) — never reaches here
+                        return;
+                    }
+
                     log::info!("[App] Cleaning up sidecars before exit...");
                     im::signal_all_agents_shutdown(&agent_state_for_tray_exit);
                     im::signal_all_bots_shutdown(&im_state_for_tray_exit);
@@ -372,17 +450,44 @@ pub fn run() {
             management_api::set_sidecar_state(sidecar_state_for_management);
 
             // Start management API (internal HTTP server for Bun→Rust IPC)
+            let app_for_mgmt = app.handle().clone();
+            let startup_timer_for_mgmt = startup_timer;
             tauri::async_runtime::spawn(async move {
                 match management_api::start_management_api().await {
-                    Ok(port) => log::info!("[App] Management API started on port {}", port),
+                    Ok(port) => {
+                        log::info!("[App] Management API started on port {}", port);
+                        let elapsed = startup_timer_for_mgmt.elapsed().as_millis();
+                        ulog_info!("[startup:profile] stage=2 name=TrayManagementAPI elapsed={}ms", elapsed);
+                        // Emit startup stage 2 (Tray & Management API)
+                        let _ = app_for_mgmt.emit("startup:stage", serde_json::json!({
+                            "stage": 2,
+                            "name": "Tray & Management API",
+                            "status": "complete",
+                            "elapsed_ms": elapsed
+                        }));
+                        log::info!("[App] Startup stage 2 (Tray & Management API) emitted");
+                    }
                     Err(e) => log::error!("[App] Failed to start management API: {}", e),
                 }
             });
 
             // Initialize cron task manager with app handle
             let cron_app_handle = app.handle().clone();
+            let app_for_s3 = app.handle().clone();
+            let startup_timer_for_s3 = startup_timer;
             tauri::async_runtime::spawn(async move {
                 cron_task::initialize_cron_manager(cron_app_handle).await;
+                let elapsed = startup_timer_for_s3.elapsed().as_millis();
+                ulog_info!("[startup:profile] stage=3 name=SchedulerMonitors elapsed={}ms", elapsed);
+                // Emit startup stage 3 (Scheduler & Monitors)
+                // Note: initialize_cron_manager emits cron:manager-ready internally
+                let _ = app_for_s3.emit("startup:stage", serde_json::json!({
+                    "stage": 3,
+                    "name": "Scheduler & Monitors",
+                    "status": "complete",
+                    "elapsed_ms": elapsed
+                }));
+                log::info!("[App] Startup stage 3 (Scheduler & Monitors) emitted");
             });
             ulog_info!("[App] Cron task manager initialization scheduled");
 
@@ -439,6 +544,12 @@ pub fn run() {
             });
             log::info!("[App] Background update task spawned successfully");
 
+            // Startup profiling summary: log total setup time when returning to Tauri.
+            // Note: Stages 2 and 3 emit independently via async tasks - see their
+            // individual [startup:profile] logs for per-stage timings.
+            let total_setup_ms = startup_timer.elapsed().as_millis();
+            ulog_info!("[startup:profile] setup complete total_setup_ms={}", total_setup_ms);
+
             Ok(())
         })
         .on_window_event(move |window, event| {
@@ -456,6 +567,18 @@ pub fn run() {
                 tauri::WindowEvent::Destroyed => {
                     use std::sync::atomic::Ordering::Relaxed;
                     if !cleanup_done_for_window.swap(true, Relaxed) {
+                        // Check for pending update or new version before cleanup.
+                        // If update is triggered, shutdown_for_update stops sidecars cleanly
+                        // and NSIS handles the restart — we don't run normal cleanup.
+                        let app_clone = window.app_handle().clone();
+                        let update_triggered = tauri::async_runtime::block_on(
+                            updater::exit_with_update_if_needed(&app_clone),
+                        );
+                        if update_triggered {
+                            // NSIS installer called exit(0) — never reaches here
+                            return;
+                        }
+
                         log::info!("[App] Window destroyed, cleaning up sidecars...");
                         im::signal_all_agents_shutdown(&agent_state_for_window);
                         im::signal_all_bots_shutdown(&im_state_for_window);
@@ -480,7 +603,20 @@ pub fn run() {
                 // Only cleanup once (Relaxed is sufficient for simple flag)
                 use std::sync::atomic::Ordering::Relaxed;
                 if !cleanup_done_for_exit.swap(true, Relaxed) {
-                    log::info!("[App] Exit requested (Cmd+Q or Dock quit), cleaning up sidecars...");
+                    // Check for pending update or new version before cleanup.
+                    // If update is triggered, shutdown_for_update stops sidecars cleanly
+                    // and NSIS handles the restart — we don't run normal cleanup.
+                    let update_triggered = tauri::async_runtime::block_on(
+                        updater::exit_with_update_if_needed(&_app_handle),
+                    );
+                    if update_triggered {
+                        // NSIS installer called exit(0) — never reaches here
+                        return;
+                    }
+
+                    log::info!(
+                        "[App] Exit requested (Cmd+Q or Dock quit), cleaning up sidecars..."
+                    );
                     im::signal_all_agents_shutdown(&agent_state_for_exit);
                     im::signal_all_bots_shutdown(&im_state_for_exit);
                     let _ = stop_all_sidecars(&sidecar_state_for_exit);

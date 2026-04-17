@@ -6,6 +6,7 @@ import { stopTabSidecar, startGlobalSidecar, initGlobalSidecarReadyPromise, mark
 import ConfirmDialog from '@/components/ConfirmDialog';
 import BugReportOverlay from '@/components/BugReportOverlay';
 import UpdateRestartOverlay, { type UpdateRestartOverlayHandle } from '@/components/UpdateRestartOverlay';
+import ShutdownProgressOverlay from '@/components/ShutdownProgressOverlay';
 import CustomTitleBar from '@/components/CustomTitleBar';
 import TabBar from '@/components/TabBar';
 import TabProvider from '@/context/TabProvider';
@@ -258,6 +259,13 @@ export default function App() {
   // Ref to control UpdateRestartOverlay progress
   const updateOverlayRef = useRef<UpdateRestartOverlayHandle | null>(null);
 
+  // Shutdown progress overlay state
+  const [showShutdownOverlay, setShowShutdownOverlay] = useState(false);
+  // Ref to store shutdown completion callback (for beforeExit promise)
+  const shutdownCompleteRef = useRef<(() => void) | null>(null);
+
+  // Startup progress overlay state
+
   // Register callbacks with useUpdater
   useEffect(() => {
     registerUpdateRestartOverlay?.(setShowUpdateRestartOverlay);
@@ -285,6 +293,9 @@ export default function App() {
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
 
+  // Startup profiling - track frontend mount time for startup timing
+  const startupStartRef = useRef(performance.now());
+
   // Silent background retry with exponential backoff
   const startGlobalSidecarSilent = useCallback(async () => {
     const MAX_RETRIES = 5;
@@ -303,6 +314,15 @@ export default function App() {
 
       markGlobalSidecarReady();
       retryCountRef.current = 0; // Reset on success
+
+      // Emit startup stage 4 (Sidecar Ready) and complete
+      const { emit } = await import('@tauri-apps/api/event');
+      emit('startup:stage', { stage: 4, name: 'Sidecar Ready', status: 'complete' });
+      emit('startup:complete', null);
+
+      // Hide the native overlay window now that frontend is ready
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('cmd_hide_overlay');
 
       // Set log server URL to global sidecar for unified logging
       try {
@@ -369,12 +389,34 @@ export default function App() {
     let unlistenTaskRecovered: (() => void) | null = null;
     let unlistenBgComplete: (() => void) | null = null;
     let unlistenSidecarRestarted: (() => void) | null = null;
+    let unlistenStartupStage: (() => void) | null = null;
 
     const setupCronRecoveryListeners = async () => {
       if (!isTauriEnvironment()) return;
 
       try {
         const { listen } = await import('@tauri-apps/api/event');
+
+        // Listen for Rust startup stage events and profile frontend timing
+        unlistenStartupStage = await listen<{ stage: number; name: string; status: string; elapsed_ms?: number }>(
+          'startup:stage',
+          (event) => {
+            if (mountedRef.current) {
+              const { stage, name, elapsed_ms } = event.payload;
+              const frontendElapsed = Math.round(performance.now() - startupStartRef.current);
+              console.log(`[startup:profile] Stage ${stage} (${name}) frontend_elapsed=${frontendElapsed}ms rust_elapsed=${elapsed_ms ?? 'N/A'}ms`);
+            }
+          }
+        );
+
+        // Listen for startup complete to log total frontend startup time
+        // Note: This event fires once at startup, no need to track unlisten
+        listen('startup:complete', () => {
+          if (mountedRef.current) {
+            const totalMs = Math.round(performance.now() - startupStartRef.current);
+            console.log(`[startup:profile] Frontend startup complete: ${totalMs}ms`);
+          }
+        });
 
         // Listen for background session completion events
         unlistenBgComplete = await listen<{ sessionId: string; sidecarStopped: boolean }>(
@@ -471,6 +513,9 @@ export default function App() {
       }
       if (unlistenSidecarRestarted) {
         unlistenSidecarRestarted();
+      }
+      if (unlistenStartupStage) {
+        unlistenStartupStage();
       }
       // Flush any pending frontend logs before shutdown
       forceFlushLogs();
@@ -1601,6 +1646,25 @@ export default function App() {
   // System tray event handling (minimize to tray, exit confirmation)
   useTrayEvents({
     minimizeToTray: config.minimizeToTray,
+    updateReady,
+    applyUpdateNow,
+    beforeExit: async () => {
+      // Emit cleanup event (fire-and-forget, best effort)
+      // Rust handler will do cleanup and call app.exit(0)
+      const { emit } = await import('@tauri-apps/api/event');
+      emit('tray:confirm-exit').catch(() => {});
+
+      // Show shutdown progress overlay and wait for completion
+      setShowShutdownOverlay(true);
+      // Wait for the overlay to complete (7 seconds animation)
+      await new Promise<void>((resolve) => {
+        shutdownCompleteRef.current = resolve;
+      });
+
+      // Animation complete - directly call exit(0)
+      const { exit } = await import('@tauri-apps/plugin-process');
+      await exit(0);
+    },
     onOpenSettings: () => handleOpenSettings('general'),
     onNavigateToTab: (tabId: string) => {
       // Verify the tab still exists before switching
@@ -1630,10 +1694,6 @@ export default function App() {
 
       // No running tasks, allow exit
       return true;
-    },
-    onDeferredExitRequested: () => {
-      // Deferred update is scheduled - show overlay with real progress
-      void applyUpdateNow();
     },
   });
 
@@ -1858,6 +1918,20 @@ export default function App() {
             }}
           />
         )}
+
+        {/* Shutdown progress overlay - shows progress when closing app */}
+        <ShutdownProgressOverlay
+          visible={showShutdownOverlay}
+          onComplete={() => {
+            // First resolve the promise to trigger actual exit
+            shutdownCompleteRef.current?.();
+            shutdownCompleteRef.current = null;
+            // Small delay before hiding overlay to ensure exit is triggered
+            setTimeout(() => {
+              setShowShutdownOverlay(false);
+            }, 100);
+          }}
+        />
       </div>
     </AuthProvider>
   );
