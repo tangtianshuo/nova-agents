@@ -398,6 +398,18 @@ pub fn run() {
                 log::info!("[App] Tray exit confirmed by user");
                 use std::sync::atomic::Ordering::Relaxed;
                 if !cleanup_done_for_tray_exit.swap(true, Relaxed) {
+                    // Check for pending update or new version before cleanup.
+                    // If update is triggered, shutdown_for_update stops sidecars cleanly
+                    // and NSIS handles the restart — we don't run normal cleanup.
+                    let app_clone = app_handle_for_tray.clone();
+                    let update_triggered = tauri::async_runtime::block_on(
+                        updater::exit_with_update_if_needed(&app_clone),
+                    );
+                    if update_triggered {
+                        // NSIS installer called exit(0) — never reaches here
+                        return;
+                    }
+
                     log::info!("[App] Cleaning up sidecars before exit...");
                     im::signal_all_agents_shutdown(&agent_state_for_tray_exit);
                     im::signal_all_bots_shutdown(&im_state_for_tray_exit);
@@ -552,6 +564,18 @@ pub fn run() {
                 tauri::WindowEvent::Destroyed => {
                     use std::sync::atomic::Ordering::Relaxed;
                     if !cleanup_done_for_window.swap(true, Relaxed) {
+                        // Check for pending update or new version before cleanup.
+                        // If update is triggered, shutdown_for_update stops sidecars cleanly
+                        // and NSIS handles the restart — we don't run normal cleanup.
+                        let app_clone = window.app_handle().clone();
+                        let update_triggered = tauri::async_runtime::block_on(
+                            updater::exit_with_update_if_needed(&app_clone),
+                        );
+                        if update_triggered {
+                            // NSIS installer called exit(0) — never reaches here
+                            return;
+                        }
+
                         log::info!("[App] Window destroyed, cleaning up sidecars...");
                         im::signal_all_agents_shutdown(&agent_state_for_window);
                         im::signal_all_bots_shutdown(&im_state_for_window);
@@ -576,7 +600,20 @@ pub fn run() {
                 // Only cleanup once (Relaxed is sufficient for simple flag)
                 use std::sync::atomic::Ordering::Relaxed;
                 if !cleanup_done_for_exit.swap(true, Relaxed) {
-                    log::info!("[App] Exit requested (Cmd+Q or Dock quit), cleaning up sidecars...");
+                    // Check for pending update or new version before cleanup.
+                    // If update is triggered, shutdown_for_update stops sidecars cleanly
+                    // and NSIS handles the restart — we don't run normal cleanup.
+                    let update_triggered = tauri::async_runtime::block_on(
+                        updater::exit_with_update_if_needed(&_app_handle),
+                    );
+                    if update_triggered {
+                        // NSIS installer called exit(0) — never reaches here
+                        return;
+                    }
+
+                    log::info!(
+                        "[App] Exit requested (Cmd+Q or Dock quit), cleaning up sidecars..."
+                    );
                     im::signal_all_agents_shutdown(&agent_state_for_exit);
                     im::signal_all_bots_shutdown(&im_state_for_exit);
                     let _ = stop_all_sidecars(&sidecar_state_for_exit);

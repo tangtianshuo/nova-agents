@@ -678,3 +678,176 @@ pub async fn test_update_connectivity(app: AppHandle) -> Result<String, String> 
 
     Ok(result)
 }
+
+/// Check and execute auto-update during app exit flow.
+///
+/// On Windows:
+///   1. Check if pending update exists on disk
+///   2. If yes → shutdown sidecars cleanly (shutdown_for_update) → install pending update
+///   3. If no → check for new version → download → install
+///   NSIS installer calls exit(0), so this function never returns on success.
+///
+/// On macOS:
+///   download_and_install handles everything inline; no pending file needed.
+///   Returns false (no update triggered) to proceed with normal cleanup.
+///
+/// Returns true if update was triggered (caller should skip normal cleanup).
+/// On Windows success paths, this function does NOT return (NSIS exit(0)).
+pub async fn exit_with_update_if_needed(app: &AppHandle) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        // Step 1: Check if we have a pending update on disk
+        if let Some(pending_version) = check_pending_update() {
+            logger::info(
+                app,
+                format!(
+                    "[Updater] Pending update v{} found on disk, installing during exit...",
+                    pending_version
+                ),
+            );
+
+            // Get the sidecar state to do a clean shutdown before NSIS
+            let sidecar_state = crate::sidecar::create_sidecar_state();
+            // shutdown_for_update blocks until all bun/SDK/MCP processes are fully terminated
+            // This prevents NSIS file-lock errors on Windows
+            if let Err(e) = crate::sidecar::shutdown_for_update(&sidecar_state) {
+                logger::error(
+                    app,
+                    format!("[Updater] Failed to shutdown sidecars before update: {}", e),
+                );
+            }
+
+            // Install the pending update — this launches NSIS and calls exit(0)
+            match install_pending_update(app.clone()).await {
+                Ok(()) => {
+                    // NSIS installer calls exit(0) on success — we never reach here
+                    logger::error(
+                        app,
+                        "[Updater] install_pending_update returned unexpectedly".to_string(),
+                    );
+                }
+                Err(e) => {
+                    logger::error(
+                        app,
+                        format!(
+                            "[Updater] Failed to install pending update v{}: {}",
+                            pending_version, e
+                        ),
+                    );
+                    // Fall through to normal cleanup
+                    return false;
+                }
+            }
+        }
+
+        // Step 2: No pending update — check for new version and download
+        logger::info(
+            app,
+            "[Updater] No pending update on disk, checking for new version during exit...".to_string(),
+        );
+        match check_and_download_silently(app).await {
+            Ok(Some(version)) => {
+                logger::info(
+                    app,
+                    format!(
+                        "[Updater] New update v{} downloaded during exit, installing...",
+                        version
+                    ),
+                );
+
+                // Same clean shutdown before NSIS
+                let sidecar_state = crate::sidecar::create_sidecar_state();
+                if let Err(e) = crate::sidecar::shutdown_for_update(&sidecar_state) {
+                    logger::error(
+                        app,
+                        format!(
+                            "[Updater] Failed to shutdown sidecars before installing v{}: {}",
+                            version, e
+                        ),
+                    );
+                }
+
+                // For the install, we need the Update object from server
+                // Build updater and check again to get the Update object
+                match build_updater_with_proxy(app) {
+                    Ok(updater) => match updater.check().await {
+                        Ok(Some(update)) => {
+                            let bytes = match std::fs::read(
+                                get_nova_agents_dir()
+                                    .unwrap_or_default()
+                                    .join("pending_update.bin"),
+                            ) {
+                                Ok(b) => b,
+                                Err(e) => {
+                                    logger::error(
+                                        app,
+                                        format!(
+                                            "[Updater] Failed to read pending update bytes: {}",
+                                            e
+                                        ),
+                                    );
+                                    return false;
+                                }
+                            };
+                            // Clear the pending files since we're about to install
+                            clear_pending_update_from_disk();
+                            // install() launches NSIS and calls exit(0)
+                            if let Err(e) = update.install(bytes) {
+                                logger::error(
+                                    app,
+                                    format!("[Updater] Failed to install v{}: {}", version, e),
+                                );
+                                return false;
+                            }
+                            // Never reaches here on success
+                        }
+                        Ok(None) => {
+                            logger::info(
+                                app,
+                                "[Updater] Server has no update (already on latest), skipping"
+                                    .to_string(),
+                            );
+                        }
+                        Err(e) => {
+                            logger::error(
+                                app,
+                                format!("[Updater] Failed to verify update with server: {}", e),
+                            );
+                        }
+                    },
+                    Err(e) => {
+                        logger::error(
+                            app,
+                            format!("[Updater] Failed to build updater: {}", e),
+                        );
+                    }
+                }
+            }
+            Ok(None) => {
+                logger::info(
+                    app,
+                    "[Updater] No new version available during exit".to_string(),
+                );
+            }
+            Err(e) => {
+                logger::error(
+                    app,
+                    format!(
+                        "[Updater] Failed to check/download update during exit: {}",
+                        e
+                    ),
+                );
+            }
+        }
+
+        false
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // macOS: download_and_install is already called during startup checks
+        // No pending file mechanism, just skip
+        let _ = app;
+        false
+    }
+}
