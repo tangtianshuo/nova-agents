@@ -287,6 +287,9 @@ pub fn run() {
             .always_on_top(true)
             .skip_taskbar(true)
             .transparent(true)
+            .inner_size(400.0, 300.0)
+            .center()
+            .visible(true)
             .build()
             {
                 Ok(_) => log::info!("[App] Native overlay shown during initialization"),
