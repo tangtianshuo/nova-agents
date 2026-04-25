@@ -1,633 +1,270 @@
-# React Componentization Pitfalls
+# Pitfalls Research
 
-**Project:** nova-agents Settings Page Refactoring
-**Researched:** 2026-04-09
-**Overall Confidence:** HIGH
+**Domain:** Store/Marketplace Feature for Tauri v2 Desktop Application
+**Researched:** 2026-04-25
+**Confidence:** MEDIUM
 
-## Executive Summary
+> Note: External documentation sources (Tauri v2 official docs, web search) were inaccessible due to network restrictions. Findings are grounded in codebase patterns observed in nova-agents and general desktop application development best practices.
 
-React componentization refactoring introduces specific risks that can silently break functionality, degrade performance, and increase maintenance burden. The most critical pitfalls are: **over-extraction creating unneeded complexity**, **breaking useEffect dependencies during extraction**, **unstable callback references causing infinite loops**, and **unnecessary re-renders from improper Context usage**. This research identifies 15 specific pitfalls with detection methods and prevention strategies tailored to large-scale React component refactoring.
+## Critical Pitfalls
 
-## Key Findings
-
-**Most Critical:** Breaking useEffect dependencies when extracting components (Pitfall #3)
-**Most Common:** Over-extraction into tiny components without clear purpose (Pitfall #1)
-**Most Insidious:** Unstable callback references causing re-render cascades (Pitfall #7)
-**Hardest to Detect:** Silent functionality regressions from incomplete state migration (Pitfall #4)
-
----
-
-## Critical Pitfalls (High Impact, High Probability)
-
-### Pitfall 1: Over-Extraction into Tiny Components
+### Pitfall 1: WebView Authentication Token Leakage via URL Parameters
 
 **What goes wrong:**
-Splitting components arbitrarily into pieces that are too small, creating unnecessary complexity without genuine reusability benefits. This is recognized as an anti-pattern when component splits don't serve clear purposes like reusability, maintainability, or performance optimization.
+Authentication tokens are exposed in browser history, server logs, and can be intercepted via referrer headers when passing tokens through URL query parameters in the WebView URL.
 
 **Why it happens:**
-- Misinterpreting "components should be small" as "smaller is always better"
-- Premature optimization for reusability that never materializes
-- Treating component extraction as an end rather than a means
+The most straightforward way to pass auth to a WebView is appending `?token=xxx` to the URL. Developers choose this because it works immediately without additional infrastructure. However, URLs are logged everywhere: browser history, server access logs, proxy logs, referrer headers, and bookmarks.
 
-**Consequences:**
-- **Increased cognitive load**: More files to navigate, harder to understand data flow
-- **Prop drilling hell**: Tiny components require passing props through multiple layers
-- **Maintenance burden**: Simple changes require touching multiple files
-- **Performance degradation**: More component boundaries means more reconciliation work
+**How to avoid:**
+- **Use `WebviewWindowBuilder` with `data` attribute injection** instead of URL parameters
+- Pass tokens via Tauri IPC (`invoke`) after window creation, then have the WebView JavaScript retrieve via `window.__TAURI__` bridge
+- For external URLs: use a server-side proxy endpoint that validates the session and issues a short-lived HttpOnly cookie
+- If URL params are unavoidable, use one-time tokens with server-side validation and immediate invalidation
 
-**Detection:**
-- Components under 50 lines that aren't reused elsewhere
-- Single-use components with 1-2 props that just render HTML
-- Files named like `XHeader`, `XTitle`, `XLabel` (atomic splitting)
-- Component directory deeper than 3 levels for a single feature
+**Warning signs:**
+- URL contains `?token=`, `?auth=`, or `?session=`
+- Console logs or error messages include full URLs with credentials
+- Server access logs show requests with token parameters in query strings
 
-**Prevention:**
-- **3 questions rule before extracting**:
-  1. Will this be reused in 2+ places?
-  2. Does it have complex state/logic worth isolating?
-  3. Does it make the code easier to understand?
-- **Keep presentation together**: Don't split header/content/title if they're always used together
-- **Co-locate related components**: Keep feature components in the same directory
-- **Minimum size threshold**: Avoid extracting components under 50-80 lines unless reusable
-
-**Phase to address:** Phase 1 (Architecture) — Establish component extraction guidelines
-
-**Sources:**
-- [Medium: Five Pitfalls of React Component Design](https://medium.com/geckoboard-under-the-hood/five-pitfalls-of-react-component-design-6d946cf4313a) (HIGH confidence)
-- [Stack Overflow: React - Overdoing it on 'small components'](https://stackoverflow.com/questions/39391195/what-are-the-disadvantages-of-using-one-big-react-component) (MEDIUM confidence)
+**Phase to address:**
+Phase 1 (Store WebView Window) must implement secure token passing before any auth-related features.
 
 ---
 
-### Pitfall 2: Prop Drilling vs Context Misapplication
+### Pitfall 2: IPC Message Format Mismatch Between WebView and Tauri
 
 **What goes wrong:**
-Either drilling props through 4+ levels creating tight coupling, OR using Context for simple 2-3 level prop passing creating unnecessary complexity.
+WebView sends messages that Tauri cannot parse, or Tauri responses are misinterpreted by WebView, causing silent failures or crashes. Common symptoms: "Unknown command" errors, JSON parse failures, or the WebView appears to freeze.
 
 **Why it happens:**
-- Context API overuse: "Context eliminates prop drilling, so use it everywhere"
-- Prop drilling inertia: Unwillingness to introduce Context for genuine cross-tree needs
-- Missing decision framework for when to use which
+The WebView is a remote context (potentially third-party storefront) sending messages via `postMessage` or Tauri invoke calls. Type mismatches occur when:
+- Rust expects `&str` but receives JSON string that needs parsing
+- Frontend sends `number` but Rust expects `i32` vs `u32`
+- Optional fields are missing vs expected `null` vs absent
+- Event names don't match registered handlers exactly (case sensitivity)
 
-**Consequences:**
-- **Prop drilling pain**: Intermediate components coupled to data they don't use ( ProvidersSection → ProviderCard → ApiKeyInput → VerifyButton)
-- **Context re-render cascades**: All consumers re-render on any Context value change
-- **Implicit dependencies**: With Context, hard to trace where data comes from
-- **Type safety erosion**: More `any` types to satisfy complex Context consumers
+**How to avoid:**
+- Define a strict IPC contract with explicit TypeScript interfaces for all commands
+- Validate all incoming payloads with explicit type checking in Rust handlers
+- Use serde's `#[serde(default)]` for optional fields to handle missing/null consistently
+- Register all IPC events in a whitelist (like the existing `JSON_EVENTS` pattern in `SseConnection.ts`)
+- Write integration tests that verify the WebView can send each command and receive correct responses
 
-**Detection:**
-- Props passed through 3+ components that don't use them (prop drilling)
-- Single-consumer Context (only one component uses the data)
-- Context value changes frequently (every render or state update)
-- Components with 10+ props from parent chains
+**Warning signs:**
+- Rust handler uses `#[tauri::command]` without validating payload structure
+- TypeScript IPC calls don't have explicit return type annotations
+- New invoke handlers aren't added to the `generate_handler!` macro
+- WebView uses `any` types for message payloads
 
-**Prevention:**
-- **Decision framework**:
-  - 2-3 levels → Prop drilling
-  - 4+ levels OR data used by 3+ components → Context
-  - Global app state (theme, auth, config) → Context
-- **Split Context by concern**: `ThemeContext`, `UserContext`, `ConfigContext` not `AppContext`
-- **Memoize Context values**: Use `useMemo` for Provider values (see project's React Stability Rule #1)
-- **Optimize Context consumers**: Use `React.memo` for expensive components consuming frequently-changing Context
-
-**Phase to address:** Phase 1 (Architecture) — Design Context strategy for Settings
-
-**Sources:**
-- Project's React Stability Rules (Rule #1: Context Provider 必须 useMemo)
-- [React.dev: Thinking in React](https://react.dev/learn/thinking-in-react) (HIGH confidence)
+**Phase to address:**
+Phase 2 (IPC Communication) must establish the contract before Phase 3 (Admin API Integration).
 
 ---
 
-### Pitfall 3: Breaking useEffect Dependencies During Extraction
+### Pitfall 3: Admin API Error Handling Silently Fails Frontend Updates
 
 **What goes wrong:**
-When extracting logic into custom hooks or child components, useEffect dependency arrays become incomplete or include unstable dependencies, causing infinite loops, stale closures, or silent failures.
+Store installation or configuration changes succeed on the backend but the frontend Settings page doesn't reflect them. Users install a Provider/Skill/MCP from the store, see no change, and reinstall repeatedly.
 
 **Why it happens:**
-- Moving state/effects without updating all related dependency arrays
-- Extracting callbacks without `useCallback` wrapping
-- Prop drilling functions that change reference every render
-- Forgetting that extracted components have separate effect lifecycles
+The admin-api.ts pattern writes config to disk and broadcasts SSE events, but:
+- SSE event `config:changed` isn't registered in the WebView's `JSON_EVENTS` whitelist
+- The Settings page uses a stale in-memory copy of config instead of re-loading
+- Error handling catches exceptions but returns success responses
+- The installation succeeds but triggers an error in the broadcast step, which is ignored
 
-**Consequences:**
-- **Infinite loops**: Effect runs → updates state → effect runs again
-- **Stale closures**: Effect captures old values, uses outdated state
-- **Silent failures**: Effect never runs, API calls don't fire
-- **Memory leaks**: Cleanup functions never called or called too late
+**How to avoid:**
+- Always return explicit error responses from Admin API: `{ success: false, error: "具体的错误信息" }`
+- Wrap all broadcast calls in try/catch that at minimum log the failure
+- Ensure frontend has a `config:changed` event listener that triggers `loadAppConfig()`
+- Verify the SSE event whitelist includes `config:changed` before deploying
+- Add a post-install verification step: fetch the installed item and confirm it appears in the list
 
-**Detection:**
-- Console warnings: "React Hook useEffect has missing dependencies"
-- Effects that run every render (add console.log to detect)
-- State updates that don't trigger expected effects
-- Memory usage growing over time (leaked intervals/timeouts)
+**Warning signs:**
+- Admin API handlers return `{ success: true }` even when disk write fails
+- No error is logged when SSE broadcast fails
+- Frontend uses `config` state directly instead of re-loading from disk after events
 
-**Prevention:**
-- **Exhaustive deps rule**: Always include all dependencies from effect scope
-- **Stabilize callbacks with useCallback**: All callbacks in effects must have stable references
-- **Ref pattern for unstable deps**: Use `useRef` for values that change but shouldn't trigger effects (see project's Rule #3: 跨组件回调稳定化)
-- **Test effect execution**: Add `console.log('[EffectName] running')` during development
-- **Use ESLint react-hooks/exhaustive-deps**: Never disable this rule!
-
-**Example from project's stability rules:**
-```typescript
-// ✅ Correct: Ref synchronization for unstable dependencies
-const onChangeRef = useRef(onChange);
-onChangeRef.current = onChange;  // Update every render
-
-useEffect(() => {
-    onChangeRef.current?.(value);  // Use ref, not onChange directly
-}, [value]);  // Don't depend on onChange
-```
-
-**Phase to address:** Phase 2-5 (All extraction phases) — Critical for every useEffect migration
-
-**Sources:**
-- Project's React Stability Rules (Rules #2, #3, #5)
-- [LogRocket: How to refactor React components to use Hooks](https://blog.logrocket.com/refactor-react-components-hooks/) (HIGH confidence)
-- [Medium: Refactoring with React Hooks - Real World examples](https://medium.com/@MartinBing/refactoring-with-react-hooks-606140d6daa6) (MEDIUM confidence)
+**Phase to address:**
+Phase 4 (Settings Hot Update) must implement and test the full config refresh cycle.
 
 ---
 
-### Pitfall 4: Silent Functionality Regressions
+### Pitfall 4: List Hot Update Triggers Infinite Re-render or Stale Data
 
 **What goes wrong:**
-During refactoring, features silently break because state is split incorrectly, event handlers are disconnected, or async operations aren't properly migrated. No errors thrown, but functionality lost.
+After installing an item from the Store, the Settings list either shows duplicate entries, shows the old list, or enters an infinite loading loop.
 
 **Why it happens:**
-- Extracting state but forgetting to wire up update handlers
-- Moving async operations to hooks but not handling loading/error states
-- Breaking callback chains during component extraction
-- Missing event handler connections in new component boundaries
+The hot update mechanism has race conditions:
+- SSE event arrives before the disk write completes (async ordering issue)
+- Frontend has multiple event listeners that all trigger the refresh
+- ConfigContext provider re-renders children unnecessarily, causing child components to re-mount
+- React strict mode double-invokes effects, causing duplicate fetches
 
-**Consequences:**
-- **Features stop working**: Buttons don't respond, forms don't submit
-- **Data inconsistencies**: State updates lost, stale data displayed
-- **User data corruption**: Save operations partially complete
-- **Hard-to-diagnose bugs**: No error messages, just wrong behavior
+**How to avoid:**
+- Implement a debounced config reload (300-500ms) to batch rapid SSE events
+- Use React `useConfig` pattern with explicit refresh triggers rather than automatic reload
+- Track reload state to prevent concurrent refreshes (isLoading flag)
+- Add response caching so repeated requests return immediately if data hasn't changed
+- Test with rapid install/uninstall cycles to expose race conditions
 
-**Detection:**
-- **Regression testing checklist**: Before/after behavior comparison
-- **Manual testing**: Click through every Settings section after each phase
-- **Console monitoring**: Watch for uncaught promise rejections
-- **State inspection**: React DevTools to verify state updates flow correctly
+**Warning signs:**
+- React DevTools shows excessive re-render counts after store operations
+- Console shows multiple `loadAppConfig()` calls in quick succession
+- The Settings page flickers or shows loading indicators during hot updates
 
-**Prevention:**
-- **Test-first refactoring**: Write tests capturing current behavior before changes (see [Common Sense Refactoring](https://alexkondov.com/refactoring-a-messy-react-component/))
-- **Incremental migration**: One section at a time, verify after each (project's Phase 1-6)
-- **Feature audit checklist**: For each Settings section, document expected behaviors:
-  - Provider API key save → should update config, clear verification status
-  - MCP server enable → should spawn server, update enabled list
-  - Custom provider add → should append to provider list, reset form
-- **Visual regression testing**: Screenshots before/after to catch UI changes
-- **Parallel development**: Keep old code working until new code verified
-
-**Phase to address:** All phases — Each phase requires regression testing before completion
-
-**Sources:**
-- [Alex Kondov: Common Sense Refactoring](https://alexkondov.com/refactoring-a-messy-react-component/) (HIGH confidence)
-- [ITNext: How to safely refactor old code](https://itnext.io/how-to-safely-refactor-old-code-part-1-a1a853263fec) (HIGH confidence)
-- [StackOverflow: How do I know I'm not breaking anything during refactoring?](https://stackoverflow.com/questions/26303380/how-do-i-know-that-im-not-breaking-anything-during-refactoring) (MEDIUM confidence)
+**Phase to address:**
+Phase 4 (Settings Hot Update) must implement debouncing and state management for hot updates.
 
 ---
 
-## Moderate Pitfalls (Medium Impact)
-
-### Pitfall 5: State Location Confusion (Lifting State Too Early)
+### Pitfall 5: Store WebView Window Becomes Orphaned on App Exit
 
 **What goes wrong:**
-Hoisting state to a higher level than necessary, causing unnecessary re-renders and tight coupling. This is a common mistake in componentization.
+The Store WebView window doesn't close when the main application closes, or closes too early interrupting operations. Memory leaks accumulate if windows aren't properly cleaned up.
 
 **Why it happens:**
-- "Props are bad, let's lift everything to Context"
-- Misunderstanding which state truly needs to be shared
-- Lifting state "just in case" it's needed elsewhere
+Unlike the main window (which has explicit lifecycle management in `lib.rs`), a secondary WebView window for the Store may not be registered in the window event handlers. This happens because:
+- Secondary windows are created via `WebviewWindowBuilder` but not tracked in the cleanup handlers
+- The `on_window_event` handler only processes `"main"` window events
+- `cleanup_done` flag isn't shared with the secondary window's lifecycle
+- Window close during active download leaves partial state
 
-**Consequences:**
-- **Performance degradation**: Unrelated components re-render when state changes
-- **Tight coupling**: Components become dependent on shared state unnecessarily
-- **Debugging difficulty**: Harder to trace which component owns which state
+**How to avoid:**
+- Register all WebView windows in a `HashMap<String, WebviewWindow>` for tracking
+- Add all windows to the same cleanup handlers in `on_window_event`
+- Use `window.close()` with proper async/await in cleanup
+- Implement a window registry that tracks which windows are open
+- Handle the `Destroyed` event for ALL windows, not just "main"
+- Consider using `tauri_plugin_single_instance` to prevent multiple store windows
 
-**Detection:**
-- State lifted to parent but only used by one child component
-- Components re-rendering when unrelated state changes (use React DevTools Profiler)
-- Props passing state through multiple levels without intermediate usage
+**Warning signs:**
+- Multiple store windows can be opened simultaneously
+- Process manager shows bun.exe or node.exe processes remaining after app close
+- App exit is delayed or hangs when store window is open
+- Memory usage grows with each store open/close cycle
 
-**Prevention:**
-- **Keep state local as long as possible**: Only lift when 2+ components need it
-- **Colocate state**: State should live as close to where it's used as possible
-- **Project's state location strategy** (from migration plan):
-  - `activeSection` → Settings (parent) — needed by Layout + Sidebar
-  - `mcpServers` → McpSection (local) — only MCP section uses it
-  - `subscriptionStatus` → ProvidersSection (local) — only providers need it
-- **Prefer props over Context**: For 2-3 component levels, props are simpler and more explicit
-
-**Phase to address:** Phase 1 (Architecture) — Design state ownership map
-
-**Sources:**
-- [Web Search Results: React state management mistakes](https://www.google.com/search?q=React+state+management+mistakes+where+state+lives+componentization) (MEDIUM confidence)
-- [Project's Migration Plan: Section 6.1](https://github.com/your-repo/docs/settings-componentization.md#61-state-location-strategy)
+**Phase to address:**
+Phase 1 (Store WebView Window) must implement proper window lifecycle from the start.
 
 ---
 
-### Pitfall 6: Breaking TypeScript Type Definitions
+## Technical Debt Patterns
 
-**What goes wrong:**
-Props interfaces become incorrect during refactoring, using `any` types, optional types (`?`) where required types are needed, or circular dependencies that break type checking.
-
-**Why it happens:**
-- Rushing to extract components without fully defining types
-- Using `any` to "make it work" temporarily
-- Complex unions/polymorphic props that are hard to type correctly
-- Not updating all call sites when interface changes
-
-**Consequences:**
-- **Loss of type safety**: Runtime errors that should be caught at compile time
-- **IDE assistance degraded**: Autocomplete stops working
-- **Confusion**: Unclear what props component actually needs
-- **Maintenance burden**: Fear of changing types because might break something
-
-**Detection:**
-- TypeScript `any` usage (search for `: any` in Props interfaces)
-- `@ts-ignore` or `@ts-expect-error` comments
-- Missing required props in TypeScript errors
-- Circular dependency warnings
-
-**Prevention:**
-- **Strict TypeScript mode**: Enable `strict: true`, `noImplicitAny`, `strictNullChecks`
-- **Define Props interfaces first**: Before extracting, write clear interface
-- **Export Props interfaces**: For shared components (ProviderCard, McpServerCard), export types
-- **Use discriminated unions for polymorphic props**: Instead of optional fields
-- **Project constraint**: "TypeScript 无 any 类型" is in QA-02 acceptance criteria
-
-**Phase to address:** All phases — Type checking required for every new component
-
-**Sources:**
-- [Medium: Best Practices for Using TypeScript with React](https://medium.com/@mkare/best-practices-for-using-typescript-with-react-bad13d851143) (MEDIUM confidence)
-- [Dev.to: TypeScript Types or Interfaces for React component props](https://dev.to/reyronald/typescript-types-or-interfaces-for-react-component-props-1408) (MEDIUM confidence)
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Using URL params for auth | Works immediately, no backend changes | Token exposure, security audit failures | Never - security risk |
+| Skipping input validation in IPC | Faster initial development | Hard-to-debug runtime crashes, security vulnerabilities | Only in proof-of-concept |
+| Returning generic errors | Simpler code | User sees unhelpful messages, hard to diagnose | Only for truly unrecoverable errors |
+| Loading config on every render | Data always fresh | Performance issues, complexity in useConfig | Never - use event-driven updates |
+| Not tracking window lifecycle | Works for simple cases | Memory leaks, orphan processes | Never |
 
 ---
 
-### Pitfall 7: Unstable Callback References Causing Re-render Cascades
+## Integration Gotchas
 
-**What goes wrong:**
-When parent components pass inline functions to children, or create new callbacks on every render, child components that should be memoized re-render unnecessarily, causing performance degradation.
-
-**Why it happens:**
-- Forgetting to wrap callbacks in `useCallback`
-- `useCallback` dependency array includes unstable values
-- Not using project's "ref synchronization" pattern for complex callbacks
-
-**Consequences:**
-- **Performance regression**: Expensive components re-render on every parent update
-- **Cascading re-renders**: One state update triggers entire subtree to re-render
-- **Battery drain**: Mobile devices suffer from constant rendering
-
-**Detection:**
-- React DevTools Profiler: Highlighted components re-rendering when props shouldn't change
-- `console.log` in component render: Logging showing frequent renders
-- Performance profiling: Long script execution times after state changes
-
-**Prevention:**
-- **All callbacks passed to children must use `useCallback`**: With minimal dependencies
-- **Ref synchronization pattern** (project's Stability Rule #3): For callbacks that need latest state but shouldn't change
-  ```typescript
-  const stateRef = useRef(state);
-  stateRef.current = state;
-
-  const stableCallback = useCallback(() => {
-      const item = stateRef.current.find(...);
-  }, []);  // Empty deps = stable reference
-  ```
-- **Memo + custom comparator** (project's Stability Rule #5): For expensive list items
-- **Split Context**: Separate data and actions Contexts (project's Stability Rule: Dual Context)
-
-**Phase to address:** Phase 3-5 (Shared components + Section extraction) — Critical for performance
-
-**Sources:**
-- Project's React Stability Rules (Rule #3, #5, 扩展模式 A)
-- [Josh Comeau: Why React Re-Renders](https://www.joshwcomeau.com/react/why-react-re-renders/) (HIGH confidence)
-- [Medium: I Cut React Component Re-Renders by 40%](https://javascript.plainenglish.io/i-cut-react-component-re-renders-by-40-heres-the-surprising-fixes-that-worked-bf1e349863b0) (MEDIUM confidence)
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Store WebView | Passing tokens via URL | Use Tauri IPC post-creation to inject tokens |
+| Store Backend | Not validating CORS for desktop | Use Rust proxy for all store API calls |
+| Admin API | Silent failures in broadcast | Always log broadcast failures, even if non-fatal |
+| Config System | Multiple concurrent reloads | Use debounce + loading state to prevent races |
+| Window Management | No cleanup for secondary windows | Track all windows in registry, cleanup on exit |
 
 ---
 
-### Pitfall 8: Context Value Instability
+## Performance Traps
 
-**What goes wrong:**
-Context Providers create new object/function references on every render, causing all consumers to re-render unnecessarily. This directly violates project's React Stability Rule #1.
-
-**Why it happens:**
-- Using inline object literals in Provider value: `value={{ state, setState }}`
-- Creating new functions in Provider: `value={{ handle: () => { ... } }}`
-- Forgetting `useMemo` for Context value
-
-**Consequences:**
-- **Massive re-render cascades**: Every Context consumer re-renders on any Provider update
-- **Performance degradation**: Especially problematic for large Context consumer trees
-- **Battery drain**: Constant re-renders on mobile devices
-
-**Detection:**
-- React DevTools Profiler: All consumers highlighting on every render
-- Many components consuming same Context all re-rendering simultaneously
-- Performance profiling shows Component.render as hotspot
-
-**Prevention:**
-- **MUST use useMemo for Context values** (project's Stability Rule #1):
-  ```typescript
-  const contextValue = useMemo(() => ({
-      showToast, success, error, warning, info
-  }), [showToast, success, error, warning, info]);
-  ```
-- **Stabilize all functions in value**: Use `useCallback` for all callbacks
-- **Split Context by change frequency**: Separate rarely-changing actions from frequently-changing data (Dual Context pattern)
-- **Use React.memo for expensive consumers**: Combine with stable Context values
-
-**Phase to address:** Phase 1 (Architecture) — Design Context structure with stability
-
-**Sources:**
-- Project's React Stability Rules (Rule #1: Context Provider 必须 useMemo)
-- [Dev.to: React.memo + useCallback: How to Avoid Unnecessary Re-renders](https://dev.to/gunnarhalen/reactmemo-usecallback-how-to-avoid-unnecessary-re-renders-3pn6) (HIGH confidence)
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Unbounded config reloads | 100% CPU during rapid store operations | Debounce SSE events 300-500ms | At 10+ rapid install/uninstall |
+| WebView memory leak | Memory grows 50MB per store open | Explicit window.destroy() on close | After 5+ store sessions |
+| SSE connection flood | Multiple SSE connections for same tab | Single SSE connection per tab, reuse | When store causes tab re-creation |
+| Large config file | Slow loadAppConfig on every change | Load only changed section, cache | At 50+ MCP servers |
 
 ---
 
-## Minor Pitfalls (Low Impact)
+## Security Mistakes
 
-### Pitfall 9: Component Nesting Too Deep
-
-**What goes wrong:**
-Creating deeply nested component hierarchies (6+ levels) making it hard to understand data flow and pass props.
-
-**Why it happens:**
-- Over-extraction (Pitfall #1) leading to deep trees
-- Not using composition to flatten structures
-- Component boundaries drawn at wrong granularity
-
-**Consequences:**
-- **Slower rendering**: Each nesting level adds processing overhead
-- **Higher memory usage**: More component instances in tree
-- **Debugging difficulty**: Hard to trace which component renders what
-
-**Detection:**
-- React DevTools Component tree: 6+ levels of nesting for single feature
-- Props passing through 4+ intermediate components that don't use them
-
-**Prevention:**
-- **Prefer composition over nesting**: Use `children` prop to flatten
-- **Limit nesting depth**: Maximum 4-5 levels for any component tree
-- **Use compound components**: For tightly related components (e.g., Tabs, Tab, TabPanel)
-
-**Phase to address:** Phase 1 (Architecture) — Review component hierarchy depth
-
-**Sources:**
-- [Hashnode: The Trouble with Unnecessary Nesting of React Components](https://anasouardini.hashnode.dev/the-trouble-with-unnecessary-nesting-of-react-components) (MEDIUM confidence)
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Tokens in URL | Token stolen via logs/referer | Use IPC injection or HttpOnly cookies |
+| No CSP for WebView | XSS in store content | Configure `csp` in WebviewWindowBuilder |
+| Store URL not validated | Phishing via malicious store | Validate store domain against allowlist |
+| No window isolation | Store can access main window APIs | Use `webviewAttributes` to disable context isolation |
+| Sensitive data in WebView storage | Data persists after close | Clear WebView storage on window close |
 
 ---
 
-### Pitfall 10: Missing Component Boundaries for List Items
+## UX Pitfalls
 
-**What goes wrong:**
-Rendering lists without proper component boundaries, causing entire list to re-render when single item changes.
-
-**Why it happens:**
-- Inline rendering in `.map()`: `{items.map(item => <div key={item.id}>{item.name}</div>)}`
-- Not extracting list items into separate components
-- Missing `key` prop or using array index as key
-
-**Consequences:**
-- **Performance degradation**: One item update re-renders entire list
-- **Lost input focus**: Re-rendering resets form inputs in list items
-
-**Detection:**
-- React DevTools Profiler: Entire list highlights when single item changes
-- Input focus loss when typing in list items
-
-**Prevention:**
-- **Extract list items into components**: `items.map(item => <Item key={item.id} data={item} />)`
-- **Use stable keys**: Unique IDs, never array indices
-- **Memo list items**: Apply `React.memo` to item components
-- **Project's Stability Rule #5**: Memo + ref pattern for expensive list rendering
-
-**Phase to address:** Phase 3 (ProviderCard, McpServerCard extraction) — Critical for lists
-
-**Sources:**
-- Project's React Stability Rules (Rule #5: memo + ref 稳定化模式)
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Store window opens but no feedback | Users think nothing happened | Show store window immediately, loading indicator while it loads |
+| Install progress unclear | Users don't know if install succeeded | Show explicit success/error toast with item name |
+| Store closes during install | Lost work, confusion | Disable close button during operations, show cancel confirmation |
+| No way to return to store | Can't browse more items | Store window should have back navigation, not just close |
+| List doesn't update after install | User reinstalls repeatedly | Always show updated list within 1 second of install completion |
 
 ---
 
-### Pitfall 11: Forgetting Cleanup Functions
+## "Looks Done But Isn't" Checklist
 
-**What goes wrong:**
-useEffect without cleanup, or cleanup that doesn't properly unsubscribe/intervals/timers, causing memory leaks and "zombie" operations.
-
-**Why it happens:**
-- Focusing on setup logic, forgetting teardown
-- Moving effects without moving cleanup functions
-- Not testing component unmount behavior
-
-**Consequences:**
-- **Memory leaks**: Intervals, event listeners, subscriptions persist after unmount
-- **"Zombie" operations**: Async operations complete after component unmounted
-- **State updates on unmounted components**: React warnings in console
-
-**Detection:**
-- React warnings: "Can't perform a React state update on an unmounted component"
-- Memory usage growing over time in DevTools
-- Console errors from callbacks executing after unmount
-
-**Prevention:**
-- **All effects with side effects need cleanup**: `useEffect(() => { ... return cleanup; }, [])`
-- **Project's Stability Rule #4**: 定时器必须清理
-- **isMountedRef pattern** (project's 扩展模式 B): Check mounted state before async updates
-  ```typescript
-  const isMountedRef = useRef(true);
-  useEffect(() => () => { isMountedRef.current = false; }, []);
-
-  fetchData().then(result => {
-      if (!isMountedRef.current) return;
-      setState(result);
-  });
-  ```
-
-**Phase to address:** All phases with useEffect migrations
-
-**Sources:**
-- Project's React Stability Rules (Rule #4, 扩展模式 B)
+- [ ] **Token Passing:** Store window appears but token isn't actually injected — verify WebView can make authenticated requests
+- [ ] **IPC Contract:** IPC handler registered but not tested with actual WebView payloads — verify with integration test
+- [ ] **Error Handling:** Admin API returns success but disk write failed silently — verify by corrupting config file during install
+- [ ] **Hot Update:** List appears to update but uses stale cache — clear cache and verify fresh load
+- [ ] **Window Cleanup:** Store window was closed but process still running — check process manager after closing
+- [ ] **SSE Events:** New events added but not in JSON_EVENTS whitelist — frontend silently drops them
 
 ---
 
-### Pitfall 12: Hook Rules Violations
+## Recovery Strategies
 
-**What goes wrong:**
-Calling hooks conditionally, inside loops, or inside nested functions, breaking React's hook order guarantees.
-
-**Why it happens:**
-- Not understanding hook order requirements
-- Extracting logic into functions that are then called conditionally
-- Converting class components without properly restructuring
-
-**Consequences:**
-- **Runtime errors**: "React has detected a change in the order of Hooks"
-- **Silent bugs**: Hooks accessing wrong state/closures
-- **Crashes**: Application completely breaks
-
-**Detection:**
-- ESLint rule: `react-hooks/rules-of-hooks` (MUST be enabled)
-- Console errors about hook order
-- Hooks returning `undefined` or wrong values
-
-**Prevention:**
-- **Two cardinal rules**:
-  1. Only call hooks at top level (not inside loops, conditions, nested functions)
-  2. Only call hooks from React functions (not regular JS functions)
-- **Enable ESLint react-hooks plugin**: Catch violations at dev time
-- **Extract custom hooks**: For reusable logic, create proper hooks (top-level functions)
-
-**Phase to address:** All phases — ESLint must pass before committing
-
-**Sources:**
-- [React.dev: Rules of Hooks](https://react.dev/reference/rules) (HIGH confidence)
-- [Medium: Refactoring with React Hooks - Real World examples](https://medium.com/@MartinBing/refactoring-with-react-hooks-606140d6daa6) (MEDIUM confidence)
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Token exposure via URL | HIGH | Invalidate exposed tokens, implement proper token injection, audit logs for token usage |
+| IPC format mismatch | MEDIUM | Add type validation in Rust, update TypeScript interfaces, redeploy store integration |
+| Silent config write failure | LOW | Check disk permissions, verify config.json is valid JSON, manually trigger config reload |
+| Orphan window | MEDIUM | Kill remaining process via task manager, add cleanup to next startup |
+| Infinite re-render | LOW | Hard refresh (Ctrl+Shift+R), disable store hot update temporarily |
 
 ---
 
-## Phase-Specific Warnings
+## Pitfall-to-Phase Mapping
 
-### Phase 1 (Layout Structure)
-
-**Pitfalls to watch:**
-- **Pitfall #9**: Component nesting too deep in Layout/Sidebar structure
-- **Pitfall #2**: Overusing Context for activeSection state (props suffice for 2 levels)
-
-**Mitigation:**
-- Keep Layout shallow: Layout → Sidebar + ContentArea
-- Use props for activeSection, not Context (only 2 components need it)
-
----
-
-### Phase 2 (Shared Components)
-
-**Pitfalls to watch:**
-- **Pitfall #1**: Over-extracting tiny components (e.g., extracting InputLabel as separate component)
-- **Pitfall #3**: Breaking useEffect dependencies in useProviderVerify hook
-- **Pitfall #7**: Unstable callbacks in ProviderCard.onVerify, McpServerCard.onToggle
-
-**Mitigation:**
-- Only extract truly reusable components (ProviderCard used by N providers)
-- Wrap all callbacks in useCallback with proper deps
-- Test hook behavior thoroughly before use
-
----
-
-### Phase 3 (ProvidersSection)
-
-**Pitfalls to watch:**
-- **Pitfall #3**: useEffect breaking when extracting provider verification logic
-- **Pitfall #4**: Silent regressions in provider add/edit/delete workflows
-- **Pitfall #7**: Re-render cascades from ProviderCard using unstable callbacks
-
-**Mitigation:**
-- Complete feature audit before extraction (document all provider workflows)
-- Test every provider operation after extraction
-- Use project's Stability Rule #5 (memo + ref) for provider list rendering
-
----
-
-### Phase 4 (McpSection)
-
-**Pitfalls to watch:**
-- **Pitfall #3**: Breaking MCP server enable/disable useEffect chains
-- **Pitfall #4**: OAuth flow breaking during dialog extraction
-- **Pitfall #6**: Complex config panel props (Playwright, EdgeTTS, GeminiImage)
-
-**Mitigation:**
-- Keep OAuth logic in one component until fully understood
-- Define strict Props interfaces for config panels before extraction
-- Test MCP enable/disable flow with real servers
-
----
-
-### Phase 5 (Cleanup)
-
-**Pitfalls to watch:**
-- **Pitfall #11**: Lingering cleanup functions not properly migrated
-- **Pitfall #6**: Lingering `any` types from rushed extraction
-
-**Mitigation:**
-- Comprehensive ESLint pass: `npm run lint` must have zero warnings
-- TypeScript strict mode check: `npm run typecheck` must pass
-- Manual audit of all useEffect callsites
-
----
-
-## Prevention Checklist
-
-### Before Extracting Any Component
-
-- [ ] Document why extraction is needed (reusability? complexity? performance?)
-- [ ] Verify component will be >50 lines (avoid over-extraction)
-- [ ] List all state/effects that will move with component
-- [ ] Write test capturing current behavior
-
-### After Extracting Component
-
-- [ ] Props interface defined and exported
-- [ ] All callbacks use `useCallback` with minimal deps
-- [ ] useEffect dependencies are exhaustive (ESLint passes)
-- [ ] Component works standalone (test in isolation)
-- [ ] No TypeScript `any` types
-- [ ] Re-render performance tested (React DevTools Profiler)
-
-### Before Committing Phase
-
-- [ ] All features from original Settings work identically
-- [ ] ESLint zero warnings
-- [ ] TypeScript typecheck passes
-- [ ] Manual regression testing complete
-- [ ] No new `console.error` or React warnings
-- [ ] Memory stable (no growing leaks in DevTools)
-
----
-
-## Confidence Assessment
-
-| Area | Confidence | Notes |
-|------|------------|-------|
-| Over-extraction risks | HIGH | Multiple authoritative sources confirm anti-pattern |
-| useEffect dependency breaking | HIGH | Project's stability rules + external sources align |
-| Performance/re-render issues | HIGH | Well-documented React performance patterns |
-| Prop drilling vs Context | HIGH | Established decision frameworks exist |
-| Regression prevention | HIGH | Standard refactoring practices |
-| TypeScript pitfalls | MEDIUM | General best practices, project-specific nuance |
-
----
-
-## Gaps to Address
-
-- **Visual regression testing**: Need to select tool (Percy? Chromatic?) and integrate into workflow
-- **Performance benchmarking**: Baseline metrics needed before refactoring (render times, re-render counts)
-- **Hook testing**: How to unit test complex hooks like `useProviderVerify`?
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| WebView Token Leakage | Phase 1 (Store WebView Window) | Security review of token passing mechanism |
+| IPC Message Format Mismatch | Phase 2 (IPC Communication) | Integration tests with mock WebView payloads |
+| Admin API Silent Failure | Phase 3 (Admin API Integration) | Error injection testing during install |
+| List Hot Update Race | Phase 4 (Settings Hot Update) | Rapid install/uninstall stress test |
+| Orphan Window on Exit | Phase 1 (Store WebView Window) | Open/close store 10 times, check process manager |
 
 ---
 
 ## Sources
 
-### High Confidence (Official docs/authoritative sources)
-- [Project's React Stability Rules](D:\Projects\Tauri\nova-agents\specs\tech_docs\react_stability_rules.md) — Directly applicable to nova-agents
-- [React.dev: Thinking in React](https://react.dev/learn/thinking-in-react)
-- [React.dev: Rules of Hooks](https://react.dev/reference/rules)
-- [Josh Comeau: Why React Re-Renders](https://www.joshwcomeau.com/react/why-react-re-renders/)
+**Codebase Evidence (nova-agents):**
+- `src/renderer/api/SseConnection.ts` lines 25-62: JSON_EVENTS whitelist pattern
+- `src-tauri/src/lib.rs` lines 255-297: Main window and overlay lifecycle management
+- `src-tauri/src/lib.rs` lines 555-594: Window event handling with cleanup
+- `src/server/admin-api.ts` lines 1-10: Admin API pattern with SSE broadcast
+- `src/server/sse.ts`: Broadcast mechanism for config updates
 
-### Medium Confidence (Reputable blogs, community consensus)
-- [Alex Kondov: Common Sense Refactoring](https://alexkondov.com/refactoring-a-messy-react-component/)
-- [ITNext: How to safely refactor old code](https://itnext.io/how-to-safely-refactor-old-code-part-1-a1a853263fec)
-- [LogRocket: How to refactor React components to use Hooks](https://blog.logrocket.com/refactor-react-components-hooks/)
-- [Dev.to: React.memo + useCallback](https://dev.to/gunnarhalen/reactmemo-usecallback-how-to-avoid-unnecessary-re-renders-3pn6)
-- [Medium: I Cut React Component Re-Renders by 40%](https://javascript.plainenglish.io/i-cut-react-component-re-renders-by-40-heres-the-surprising-fixes-that-worked-bf1e349863b0)
-- [Medium: Five Pitfalls of React Component Design](https://medium.com/geckoboard-under-the-hood/five-pitfalls-of-react-component-design-6d946cf4313a)
+**General Desktop Application Patterns:**
+- Tauri v2 WebviewWindowBuilder documentation (inaccessible during research)
+- Desktop marketplace integration patterns from Electron ecosystem
+- IPC security best practices for desktop applications
 
-### Web Search Results (Lower confidence, corroboration needed)
-- Various StackOverflow discussions on component size and prop drilling
-- Community blog posts on TypeScript best practices
+**Confidence Assessment:**
+- Stack patterns: MEDIUM (codebase patterns verified, external docs inaccessible)
+- Architecture: MEDIUM (follows existing nova-agents patterns)
+- Pitfalls: MEDIUM (based on common desktop app patterns, not external research)
 
 ---
 
-*Last updated: 2026-04-09*
-*Next review: After Phase 1 completion, validate prevention strategies*
+*Pitfalls research for: Store/Marketplace Feature*
+*Researched: 2026-04-25*

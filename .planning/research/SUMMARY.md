@@ -1,359 +1,161 @@
-# Settings Componentization Research Summary
+# Project Research Summary
 
-**Project:** nova-agents Settings Page Refactoring
-**Date:** 2026-04-09
-**Status:** Complete
-
----
+**Project:** Store/Marketplace Feature for nova-agents
+**Domain:** Desktop AI Agent Application Store
+**Researched:** 2026-04-25
+**Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-nova-agents Settings.tsx (5707 lines) is a monolithic React component that requires systematic refactoring into a modular, maintainable architecture. Research reveals that large-scale React componentization follows well-established patterns: **layout composition + section isolation + shared component layer + custom hooks encapsulation**. The recommended approach uses **React 19 + TypeScript 5.9** with **no new libraries**, leveraging existing project patterns (useConfig, dual context, stability rules).
+The Store feature is a secondary WebView window that loads a remote Store URL, allowing users to browse and install Providers/Skills/MCP servers without leaving the app. It integrates with the existing architecture via IPC commands (`cmd_store_install`) that route through the Admin API, with config changes automatically propagating to the frontend via the SSE event system.
 
-**Key Finding:** The Settings page exhibits classic anti-patterns—monolithic component, deep prop drilling, mixed concerns—that are well-documented in the React community. Modern best practices emphasize **atomic components, clear state boundaries, and business logic encapsulation through custom hooks**. Differentiation comes from developer experience (type safety, consistent patterns, maintainable architecture) rather than novel features.
+Experts build this using Tauri v2's `WebviewWindowBuilder` with `WebviewUrl::External` - the same pattern used for the overlay window. The Store WebView communicates via Tauri invoke commands, not direct HTTP, respecting the "Rust proxy layer" architecture principle. No new npm packages are needed; everything reuses existing APIs (`@tauri-apps/api`, existing event system, existing Admin API).
 
-**Critical Risks:** The most dangerous pitfalls are **breaking useEffect dependencies during extraction** (causes infinite loops/silent failures), **over-extraction creating unnecessary complexity**, and **unstable callback references causing re-render cascades**. Prevention requires strict adherence to project's React Stability Rules and incremental migration with regression testing at each phase.
-
----
+Key risks center on secure token injection into the WebView (Pitfall 1), IPC contract stability (Pitfall 2), and proper window lifecycle management (Pitfall 5). These are all addressable in Phase 1 with correct patterns from the start.
 
 ## Key Findings
 
-### From STACK.md
+### Recommended Stack
 
-**Core Technologies (no new libraries needed):**
-- **React 19.2.0** - UI framework (already in use)
-- **TypeScript 5.9.3** - Type safety (strict mode enabled)
-- **Tauri v2.9.6** - Desktop framework (existing IPC integration)
+**Core technologies:**
+- `@tauri-apps/api` (~2.10) - WebView creation and IPC via `invoke`/`emit`
+- `tauri` (2.9.6) - Runtime with `WebviewUrl::External` support for remote Store URL
+- `core:webview` permissions - Required for creating secondary WebView windows
+- `core:webview:allow-create-webview-window` + `core:webview:allow-post-message` - New permissions needed
+- No new npm packages required
 
-**Component Composition Patterns:**
-- **Compound Components** - For complex shared-state components (SettingsSidebar, dialogs)
-- **Custom Hooks** - Extract reusable business logic (useProviderVerify, useMcpServers)
-- **Presentational + Container Pattern** - Separate concerns (section containers manage state, presenters render UI)
+**What NOT to use:**
+- `WebviewWindowBuilder::remote` (deprecated) - use `WebviewUrl::External`
+- Raw `window.postMessage` without Tauri event bridge - use `emit`/`listen`
+- Direct HTTP from WebView - violates Rust proxy layer principle
 
-**State Management Strategy:**
-- **Local useState/useReducer** - Component-scoped state (default)
-- **useConfig (existing)** - Global configuration (providers, apiKeys, mcpServers)
-- **React Context** - Section-scoped shared state (avoid prop drilling 3+ levels)
-- **Callback Props** - Parent-child communication (explicit data flow)
+### Expected Features
 
-**Type Safety Patterns:**
-- **Strict Props Interfaces** - All components must have explicit TypeScript types
-- **Discriminated Unions** - For state with status variants (verifyStatus, subscriptionStatus)
-- **Branded Types** - For critical IDs (providerId, mcpServerId) to prevent mix-ups
-- **Generic Components** - Reusable list components (ProviderCard, McpServerCard)
+**Must have (table stakes):**
+- Store entry button in Settings sidebar - P1
+- Store WebView window opens with remote URL - P1
+- Basic install flow: WebView -> IPC -> Admin API -> success/failure - P1
+- Auth token injected into Store WebView on open - P1
+- Installed lists refresh after successful install - P1
 
-**Anti-Patterns to Avoid:**
-- Prop drilling through 3+ layers (use Context instead)
-- Giant single Context for all Settings (causes re-renders)
-- Adding Redux/Zustand (over-engineering for this scope)
-- Using `any` for props (defeats TypeScript purpose)
+**Should have (competitive):**
+- Hot-update Settings lists without page reload - P2
+- Install progress indicator (loading state during install) - P2
+- Background install (user can browse while install completes) - P2
 
-### From FEATURES.md
+**Defer (v2+):**
+- Offline store browsing/caching
+- Search within Store
+- Ratings and reviews
+- Featured/promoted items
+- Store notifications for updates to installed items
 
-**Table Stakes (minimum viable features):**
-- **Atomic Components** - Breaking down large components into reusable pieces
-- **Clear Props Interfaces** - TypeScript requires explicit type definitions
-- **State Localization** - Keep state close to where it's used
-- **Section-Based Navigation** - Sidebar navigation for multiple categories
-- **Form Validation** - Required fields, format checks (API keys, URLs)
-- **Persistence Layer** - Settings changes must persist to disk/API
-- **Loading States** - Visual feedback for async operations
-- **Error Handling** - Toast notifications, inline errors, retry mechanisms
-- **Responsive Design** - Mobile: collapsible sidebar, stacked layout
-- **Accessibility** - Keyboard navigable with ARIA labels
+### Architecture Approach
 
-**Differentiators (nice-to-have features):**
-- **Compound Component Pattern** - Flexible API with shared state
-- **Custom Hooks Abstraction** - Encapsulate business logic, improve testability
-- **Optimistic UI Updates** - Instant feedback, rollback on error
-- **Schema-Driven Validation** - Declarative validation rules
-- **Real-Time Validation** - Debounced validation as user types
-- **Search/Filter** - Quickly find settings (valuable for 10+ sections)
+The Store feature follows the existing overlay window pattern from `lib.rs` lines 281-297. A new `"store"` labeled WebView window is created via `WebviewWindowBuilder`, loading a remote Store URL via `WebviewUrl::External`. The WebView communicates with Tauri via IPC (`invoke`) commands, not direct HTTP. Install commands route to `cmd_store_install` which calls the Admin API via Global Sidecar HTTP. Config changes propagate via SSE broadcast (`config-changed` event), which `ConfigDataContext` already listens to, triggering automatic React state refresh.
 
-**Anti-Features (explicitly NOT build):**
-- Deep prop drilling (use Context instead)
-- Monolithic components (keep files <500 lines)
-- Mixing concerns (separate UI, logic, data fetching)
-- Global state for local UI (use local useState for ephemeral state)
-- String-based props (use TypeScript enums/union types)
-- Uncontrolled components (use controlled inputs with explicit state)
+**Major components:**
+1. **Store WebView window** (`lib.rs`) - Secondary window via `WebviewWindowBuilder`, standard decorations, ~1000x700 centered
+2. **Store IPC handler** (`commands.rs` / `store.rs`) - `cmd_store_install`, `cmd_get_store_auth_token` bridging WebView to Admin API
+3. **Admin API extension** (`admin-api.ts`) - Installation handlers reusing existing MCP/Provider patterns with SSE broadcast
+4. **ConfigDataContext** - Existing auto-refresh on `nova-agents:config-changed` event (no new code needed)
 
-**Component Patterns:**
-1. **Card-Based Layout** - Settings organized into cards with title, description, controls
-2. **Compound Components** - Parent/child sharing implicit state via Context
-3. **Control/Controlled Pattern** - Split into stateless (controlled by parent) and stateful variants
-4. **Render Props** - Component receives function as children for maximum flexibility
+### Critical Pitfalls
 
-**State Management Hierarchy:**
-```
-Settings (useConfig) — Global state
-  │
-  ├─→ ProvidersSection — Section-level state
-  │     ├─→ useState: showCustomForm
-  │     ├─→ useState: editingProvider
-  │     └─→ ProvidersSectionContext — Shared with children
-  │
-  └─→ McpSection — Section-level state
-        ├─→ useState: mcpForm
-        └─→ McpSectionContext — Shared with children
-```
+1. **Token leakage via URL parameters** - Never pass auth tokens in URL query params. Use IPC post-creation injection via `window.__TAURI__` or Tauri event bridge. Address in Phase 1.
 
-### From ARCHITECTURE.md
+2. **IPC message format mismatch** - Define strict TypeScript interfaces for all commands. Use serde `#[serde(default)]` for optional fields. Register events in JSON_EVENTS whitelist. Address in Phase 2.
 
-**Component Hierarchy:**
-```
-Settings (index.tsx - 200 lines)
-    │
-    ├─→ SettingsLayout (150 lines)
-    │       ├─→ SettingsSidebar (200 lines)
-    │       └─→ Content Area (dynamic)
-    │               │
-    │               ├─→ AccountSection (100 lines)
-    │               ├─→ GeneralSection (300 lines)
-    │               ├─→ ProvidersSection (600 lines)
-    │               │       ├─→ ProviderCard × N (150 lines each)
-    │               │       ├─→ ApiKeyInput (80 lines)
-    │               │       ├─→ VerifyStatusIndicator (60 lines)
-    │               │       └─→ CustomProviderDialog (300 lines)
-    │               │
-    │               ├─→ McpSection (800 lines)
-    │               │       ├─→ McpServerCard × N (150 lines each)
-    │               │       ├─→ CustomMcpDialog (250 lines)
-    │               │       └─→ Config Panels (Playwright/EdgeTTS/GeminiImage)
-    │               │
-    │               └─→ [Other sections]
-```
+3. **Admin API silent failures** - Always return explicit `{ success: false, error }` responses. Wrap broadcast calls in try/catch that log failures. Address in Phase 3.
 
-**Directory Structure:**
-```
-src/renderer/pages/Settings/
-├── index.tsx                    # Main entry, composition root
-├── SettingsLayout.tsx           # Layout container
-├── SettingsSidebar.tsx          # Navigation sidebar
-├── sections/                    # Settings sections
-│   ├── AccountSection.tsx
-│   ├── GeneralSection.tsx
-│   ├── ProvidersSection.tsx
-│   ├── McpSection.tsx
-│   └── [other sections]
-├── components/                  # Shared components
-│   ├── ProviderCard.tsx
-│   ├── McpServerCard.tsx
-│   ├── ApiKeyInput.tsx
-│   ├── VerifyStatusIndicator.tsx
-│   └── [dialogs]
-└── hooks/                       # Business logic hooks
-    ├── useProviderVerify.ts
-    ├── useMcpServers.ts
-    └── useSubscription.ts
-```
+4. **Hot update race conditions** - Implement debounced config reload (300-500ms) to batch rapid SSE events. Track reload state to prevent concurrent refreshes. Address in Phase 4.
 
-**Component Boundaries:**
-- **Layout Layer** - SettingsLayout (container), SettingsSidebar (navigation)
-- **Section Layer** - ProvidersSection, McpSection (business logic containers)
-- **Shared Component Layer** - ProviderCard, McpServerCard, ApiKeyInput (reusable UI)
-- **Dialog Layer** - CustomProviderDialog, CustomMcpDialog (complex forms)
-- **Custom Hooks Layer** - useProviderVerify, useMcpServers, useSubscription (logic)
-
-**Data Flow:**
-```
-User Interaction
-    ↓
-Component Event Handler
-    ↓
-Parent Callback (props.onSave, props.onToggle)
-    ↓
-Section Component Handler
-    ↓
-Custom Hook Action
-    ↓
-API Call (apiPost, invoke, configService)
-    ↓
-State Update (useState or useConfig)
-    ↓
-Re-render with New Props
-```
-
-**State Location Strategy:**
-| State Type | Location | Rationale |
-|------------|----------|-----------|
-| `activeSection` | Settings (parent) | Shared across layout |
-| `providers` | useConfig (global) | Global configuration, disk-first |
-| `apiKeys` | useConfig (global) | Security-sensitive, global |
-| `mcpServers` | McpSection (local) | Section-specific only |
-| `customForm` | ProvidersSection (local) | Transient form state |
-| `subscriptionStatus` | ProvidersSection (local) | Only needed in providers |
-| `verifyStatus` | useProviderVerify (hook) | Encapsulated business logic |
-
-### From PITFALLS.md
-
-**Critical Pitfalls (High Impact, High Probability):**
-
-1. **Over-Extraction into Tiny Components** - Splitting components arbitrarily into pieces too small, creating unnecessary complexity. Prevention: 3 questions rule (reused 2+ places? complex logic? easier to understand?), minimum 50-80 line threshold.
-
-2. **Prop Drilling vs Context Misapplication** - Either drilling 4+ levels (tight coupling) OR using Context for simple 2-level passing (over-engineering). Prevention: Decision framework (2-3 levels = props, 4+ levels or 3+ consumers = Context), split Context by concern.
-
-3. **Breaking useEffect Dependencies** - When extracting logic, dependency arrays become incomplete, causing infinite loops/stale closures. Prevention: Exhaustive deps rule, stabilize callbacks with useCallback, ref pattern for unstable deps, ESLint react-hooks/exhaustive-deps MUST be enabled.
-
-4. **Silent Functionality Regressions** - Features silently break during refactoring (state split incorrectly, handlers disconnected). Prevention: Test-first refactoring, incremental migration, feature audit checklist, visual regression testing.
-
-**Moderate Pitfalls (Medium Impact):**
-
-5. **State Location Confusion** - Lifting state too early, causing unnecessary re-renders. Prevention: Keep state local as long as possible, only lift when 2+ components need it.
-
-6. **Breaking TypeScript Type Definitions** - Props interfaces incorrect during refactoring, using `any` types. Prevention: Strict TypeScript mode, define Props interfaces first, export interfaces for shared components.
-
-7. **Unstable Callback References** - Parent inline functions cause memoized children to re-render. Prevention: All callbacks use `useCallback`, ref synchronization pattern for complex callbacks, memo + custom comparator for expensive lists.
-
-8. **Context Value Instability** - Context Providers create new object/function references every render, causing all consumers to re-render. Prevention: MUST use `useMemo` for Context values (project Stability Rule #1), stabilize all functions with `useCallback`.
-
-**Minor Pitfalls (Low Impact):**
-
-9. **Component Nesting Too Deep** - 6+ levels making data flow hard to trace. Prevention: Prefer composition over nesting, limit to 4-5 levels max, use compound components.
-10. **Missing Component Boundaries for List Items** - Rendering lists without proper boundaries, causing entire list re-render. Prevention: Extract list items into components, use stable keys (unique IDs), memo list items.
-11. **Forgetting Cleanup Functions** - useEffect without cleanup causing memory leaks. Prevention: All effects with side effects need cleanup, use isMountedRef pattern for async operations.
-12. **Hook Rules Violations** - Calling hooks conditionally/inside loops, breaking hook order. Prevention: Only call hooks at top level, enable ESLint react-hooks plugin.
-
-**Phase-Specific Warnings:**
-- **Phase 1 (Layout):** Pitfall #9 (nesting too deep), Pitfall #2 (overusing Context for activeSection)
-- **Phase 2 (Shared Components):** Pitfall #1 (over-extraction), Pitfall #3 (useEffect breaking), Pitfall #7 (unstable callbacks)
-- **Phase 3 (ProvidersSection):** Pitfall #3 (useEffect breaking), Pitfall #4 (silent regressions), Pitfall #7 (re-render cascades)
-- **Phase 4 (McpSection):** Pitfall #3 (useEffect breaking), Pitfall #4 (OAuth flow breaking), Pitfall #6 (complex config panel props)
-
----
+5. **Orphaned WebView window on exit** - Register all WebView windows in a HashMap for tracking. Add all windows to cleanup handlers in `on_window_event`. Handle `Destroyed` event for ALL windows. Address in Phase 1.
 
 ## Implications for Roadmap
 
-### Suggested Phase Structure
+Based on research, a 4-phase structure is recommended:
 
-Based on combined research, the migration should follow this 7-phase sequence:
+### Phase 1: Window Foundation
+**Rationale:** Window creation is the prerequisite for everything else. Must implement secure token injection and proper lifecycle from the start to avoid retrofitting security later.
 
-**Phase 1: Foundation (Low Risk)**
-- **Rationale:** Build structure first, migrate static sections to establish layout
-- **Delivers:** SettingsLayout, SettingsSidebar, AccountSection, AboutSection, index.tsx entry
-- **Features:** Layout composition, section-based navigation
-- **Pitfalls to Avoid:** Component nesting too deep, overusing Context for activeSection
-- **Research Needed:** None (well-established patterns)
+**Delivers:** Store WebView window that opens/closes cleanly with proper lifecycle tracking
+**Addresses:** Pitfalls 1 (token leakage) and 5 (orphan window)
+**Uses:** `WebviewWindowBuilder`, new `core:webview` permissions
 
-**Phase 2: Shared Components (Medium Risk)**
-- **Rationale:** Extract reusable pieces before complex logic, ensures components are tested
-- **Delivers:** ProviderCard, ApiKeyInput, VerifyStatusIndicator, McpServerCard
-- **Features:** Atomic components, clear props interfaces, reusable UI
-- **Pitfalls to Avoid:** Over-extraction, breaking useEffect dependencies, unstable callbacks
-- **Research Needed:** None (standard React patterns)
+### Phase 2: IPC Bridge
+**Rationale:** IPC contract must be stable before install flow can work. Auth token sharing via IPC is Phase 2, not Phase 1, because window must exist first to receive the token.
 
-**Phase 3: Business Logic Hooks (Medium Risk)**
-- **Rationale:** Encapsulate complex state management before migrating complex sections
-- **Delivers:** useProviderVerify, useMcpServers, useSubscription
-- **Features:** Custom hooks abstraction, business logic encapsulation
-- **Pitfalls to Avoid:** Breaking useEffect dependencies, unstable callback references
-- **Research Needed:** Detailed API call sequences for verification/MCP operations
+**Delivers:** `cmd_store_install` and `cmd_get_store_auth_token` commands wired to WebView
+**Addresses:** Pitfall 2 (IPC format mismatch)
+**Uses:** Existing command patterns from `commands.rs`
 
-**Phase 4: Complex Sections (High Risk)**
-- **Rationale:** Migrate most complex sections using extracted components + hooks
-- **Delivers:** ProvidersSection, McpSection (using shared components + hooks)
-- **Features:** Complete provider/MCP management, state localization, custom hooks
-- **Pitfalls to Avoid:** Silent regressions, breaking useEffect chains, OAuth flow breaking
-- **Research Needed:** Provider verification flow, MCP enable/disable logic, OAuth integration
+### Phase 3: Admin API Integration
+**Rationale:** Installation logic depends on IPC bridge. Must wire up SSE broadcast so frontend auto-refreshes.
 
-**Phase 5: Simple Sections (Low Risk)**
-- **Rationale:** Migrate remaining sections, compose existing extracted components
-- **Delivers:** GeneralSection, SkillsAgentsSection, AgentSection, UsageStatsSection
-- **Features:** Complete settings coverage, all sections modularized
-- **Pitfalls to Avoid:** State location confusion, prop drilling
-- **Research Needed:** None (leverages existing extracted components)
+**Delivers:** End-to-end install flow: WebView -> IPC -> Admin API -> config write -> SSE broadcast -> Settings update
+**Addresses:** Pitfall 3 (silent failure)
+**Uses:** Admin API handlers, `broadcast()` pattern
 
-**Phase 6: Dialogs (Low Risk)**
-- **Rationale:** Extract complex dialogs and panels (isolated components)
-- **Delivers:** PlaywrightConfigPanel, EdgeTtsConfigPanel, GeminiImageConfigPanel, CustomMcpDialog, CustomProviderDialog
-- **Features:** Compound components, complex form validation
-- **Pitfalls to Avoid:** Breaking TypeScript type definitions, complex props interfaces
-- **Research Needed:** Form validation patterns, config panel state management
+### Phase 4: Settings Integration and Polish
+**Rationale:** Entry point and end-to-end testing come last once all internals are stable.
 
-**Phase 7: Cleanup (Low Risk)**
-- **Rationale:** Remove old code, verify all functionality, performance audit
-- **Delivers:** Delete old Settings.tsx, update imports, comprehensive testing
-- **Features:** Complete migration, zero regression bugs
-- **Pitfalls to Avoid:** Lingering cleanup functions, TypeScript `any` types
-- **Research Needed:** Performance profiling baseline
+**Delivers:** Store button in Settings sidebar, install progress feedback, deep-link to Settings panels
+**Addresses:** Pitfall 4 (hot update race), P2 features
+
+### Phase Ordering Rationale
+
+- Window first because no other phase can be tested without it
+- IPC second because install commands cannot flow without it
+- Admin API third because it completes the install flow
+- Settings last because it's the user-facing entry point on stable internals
 
 ### Research Flags
 
-**Needs Deeper Research:**
-- **Phase 3 (Business Logic Hooks):** Provider verification API call sequence, error handling patterns, retry strategies
-- **Phase 4 (Complex Sections):** MCP enable/disable async operation management, OAuth integration architecture (if applicable)
-- **Phase 6 (Dialogs):** Form validation patterns for custom provider/MCP forms, schema-driven validation approach
+Phases likely needing deeper research during planning:
+- **Phase 2:** Secure token injection mechanism - needs validation with Tauri v2 WebView APIs to confirm `emit`/`listen` pattern works for token delivery
+- **Phase 3:** Install rollback/error recovery - partial failure scenarios need defined recovery paths
 
-**Standard Patterns (Skip Research):**
-- **Phase 1 (Foundation):** Layout composition, sidebar navigation - well-documented React patterns
-- **Phase 2 (Shared Components):** Atomic components, props interfaces - standard React practice
-- **Phase 5 (Simple Sections):** Section composition, existing component reuse - project already has examples
-- **Phase 7 (Cleanup):** Code deletion, testing - standard development practices
-
----
+Phases with standard patterns (skip research-phase):
+- **Phase 1:** Window creation - direct reuse of overlay pattern from `lib.rs` lines 281-297
+- **Phase 4:** Settings button - simple component addition, well-understood
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| **Stack** | HIGH | React 19 + TypeScript 5.9 already in use, no new libraries needed |
-| **Features** | HIGH | Table stakes well-documented in official React docs, differentiators based on established community patterns |
-| **Architecture** | HIGH | Component hierarchy, data flow, state management backed by official React documentation and project's existing patterns |
-| **Pitfalls** | HIGH | 12 pitfalls identified with specific detection methods and prevention strategies; 4 critical pitfalls have high-confidence sources |
+| Stack | HIGH | Based on verified codebase patterns from lib.rs overlay implementation |
+| Features | MEDIUM | Based on known marketplace patterns (VSCode/JetBrains/Slack); web search unavailable |
+| Architecture | HIGH | Follows existing nova-agents patterns exactly (overlay window, Admin API, SSE broadcast) |
+| Pitfalls | MEDIUM | Based on common desktop app patterns; external Tauri docs inaccessible |
 
-**Overall Confidence: HIGH**
+**Overall confidence:** MEDIUM-HIGH
 
-**Gaps to Address:**
-1. **Provider Verification Flow** - Detailed API call sequence, error handling, retry strategies
-2. **MCP Enable/Disable Logic** - Async operation management, error recovery
-3. **OAuth Integration** - Third-party auth flow architecture (if applicable to providers)
-4. **Form Validation** - Validation patterns for custom provider/MCP forms
-5. **Performance Profiling** - Baseline metrics before refactoring (render times, re-render counts)
+### Gaps to Address
 
-These gaps are **NOT blockers** for starting Phase 1-2 (Foundation + Shared Components), but should be addressed before Phase 3-4 (Business Logic Hooks + Complex Sections).
-
----
+- **Secure token injection:** The recommended approach (IPC post-creation token injection) needs validation in Tauri v2 WebView context - confirm WebView JavaScript can access `window.__TAURI__` reliably
+- **Store URL configuration:** Where/how to configure the Store URL (hardcoded vs config file vs env var) not yet determined
+- **Install rollback:** Partial failure scenarios (config write succeeds but MCP tool install fails) need defined recovery paths
+- **WebView lifecycle:** Whether Store window should be hidden on close (fast re-open) vs destroyed (clean slate) - affects memory management
 
 ## Sources
 
-### Stack Research
-- [React Composition Patterns - LobeHub](https://lobehub.com/skills/tech-leads-club-agent-skills-react-composition-patterns)
-- [Advanced React 19 Patterns - Rakesh Purohit](https://therakeshpurohit.medium.com/how-can-react-wizards-cast-spellbinding-patterns-%25EF%25B8%258F-9e4f9bd060f7)
-- [Compound Components Pattern - FreeCodeCamp](https://www.freecodecamp.org/news/compound-components-pattern-in-react/)
-- [React State Management 2025 - DeveloperWay](https://www.developerway.com/posts/react-state-management-2025)
-- [React & TypeScript: 10 Patterns - LogRocket](https://blog.logrocket.com/react-typescript-10-patterns-writing-better-code/)
+### Primary (HIGH confidence)
+- `src-tauri/src/lib.rs` lines 281-297 - Overlay window pattern (direct reference)
+- `src-tauri/src/commands.rs` - Command structure patterns
+- `src/server/admin-api.ts` - Installation logic patterns
+- `src/renderer/config/ConfigProvider.tsx` lines 331-343 - Config auto-refresh
+- `src/renderer/api/SseConnection.ts` - JSON_EVENTS whitelist pattern
 
-### Features Research
-- [React Documentation - Thinking in React](https://react.dev/learn/thinking-in-react)
-- [React Documentation - Lifting State Up](https://react.dev/learn/sharing-state-between-components)
-- [TypeScript Handbook - React](https://www.typescriptlang.org/docs/handbook/react.html)
-- [How I Structure Large Forms in React](https://medium.com/devmap/how-i-structure-large-forms-in-react-04ea2cd9a2e0)
-- [Advanced Guide on React Component Composition](https://makersden.io/blog/guide-on-react-component-composition)
+### Secondary (MEDIUM confidence)
+- VSCode Marketplace behavior - Extension installation flow
+- JetBrains IDE Plugin ecosystem - One-click install patterns
+- Tauri v2 WebViewUrl::External - Known API pattern
 
-### Architecture Research
-- [React Stack Patterns](https://www.patterns.dev/react/react-2026/)
-- [React Architecture Patterns and Best Practices for 2026](https://www.bacancytechnology.com/blog/react-architecture-patterns-and-best-practices)
-- [Frontend Design Patterns That Actually Work in 2026](https://www.netguru.com/blog/frontend-design-patterns)
-- nova-agents Settings.tsx (5707 lines) - Current implementation analysis
-- nova-agents specs/tech_docs/react_stability_rules.md - Project-specific patterns
-
-### Pitfalls Research
-- [Five Pitfalls of React Component Design](https://medium.com/geckoboard-under-the-hood/five-pitfalls-of-react-component-design-6d946cf4313a)
-- [React.dev: Thinking in React](https://react.dev/learn/thinking-in-react)
-- [React.dev: Rules of Hooks](https://react.dev/reference/rules)
-- [Josh Comeau: Why React Re-Renders](https://www.joshwcomeau.com/react/why-react-re-renders/)
-- [Alex Kondov: Common Sense Refactoring](https://alexkondov.com/refactoring-a-messy-react-component/)
-- [LogRocket: How to refactor React components to use Hooks](https://blog.logrocket.com/refactor-react-components-hooks/)
-- nova-agents specs/tech_docs/react_stability_rules.md - Project's 5 stability rules
-
-### Project-Specific Sources
-- nova-agents Settings.tsx - Source of truth for existing patterns
-- nova-agents design_guide.md - Design system constraints
-- nova-agents architecture.md - Project architecture and state management
-- nova-agents CLAUDE.md - Core architectural constraints
+### Tertiary (LOW confidence)
+- External Tauri v2 documentation - Inaccessible during research; assumptions based on existing codebase
+- Store feature UX specifics - No web search available; competitor patterns used as proxy
 
 ---
-
-**Research completed:** 2026-04-09
-**Next step:** Proceed to requirements definition (gsd:requirements)
-**Orchestrator:** Can proceed to roadmap creation based on SUMMARY.md
+*Research completed: 2026-04-25*
+*Ready for roadmap: yes*

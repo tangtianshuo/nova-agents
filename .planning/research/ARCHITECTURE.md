@@ -1,628 +1,439 @@
-# Architecture Patterns: Settings Page Componentization
+# Architecture Research: Store Feature Integration
 
-**Project:** nova-agents Settings Page Refactoring
-**Researched:** 2026-04-09
-**Overall confidence:** HIGH
+**Domain:** Desktop AI Agent Application (Tauri v2 + React 19 + Bun Sidecar)
+**Researched:** 2026-04-25
+**Confidence:** HIGH
 
 ## Executive Summary
 
-Large React settings pages follow a consistent architectural pattern of **layout composition + section isolation + shared component layer + custom hooks encapsulation**. The nova-agents Settings.tsx (5707 lines) requires refactoring into this modular pattern to improve maintainability from <2000 lines to <500 lines per file with clear component boundaries.
+The Store feature integrates with nova-agents as a secondary WebView window that loads a remote Store URL. The WebView communicates with Tauri via IPC commands to trigger installations (MCP/Provider/Skill), which flow through the existing Admin API. Config changes automatically propagate to the frontend via the existing SSE event system, ensuring Settings lists update without manual refresh.
 
-**Key architectural principles identified:**
-1. **Layout-Content Separation** - Sidebar navigation and content area are distinct layout components
-2. **Section Independence** - Each settings section (Account, Providers, MCP, etc.) is an isolated module
-3. **Shared Component Reusability** - Cards, inputs, dialogs form a reusable component library
-4. **Business Logic Encapsulation** - Custom hooks encapsulate complex state management
-5. **Props-Down, Callbacks-Up** - Unidirectional data flow with explicit boundaries
+**Key architectural decisions:**
+1. **Store WebView window** - Created via `WebviewWindowBuilder`, follows existing overlay window pattern
+2. **IPC bridge** - New `cmd_store_install` command handles WebView-to-Rust communication
+3. **Config auto-refresh** - Existing `nova-agents:config-changed` event listener handles hot update
+4. **Global Sidecar** - Store uses Global Sidecar (no tab context), Admin API for installations
 
 ## Research Findings
 
-### Industry Patterns (2026)
+### Integration Points Identified
 
-Based on web research of current React architecture patterns:
+| Integration Point | File | Purpose |
+|-------------------|------|---------|
+| Settings entry | `src/renderer/pages/Settings.tsx` | Store button/entry point |
+| Store window | `src-tauri/src/lib.rs` | Window creation via WebviewWindowBuilder |
+| Store IPC | `src-tauri/src/commands.rs` | cmd_store_install command |
+| Admin API | `src/server/admin-api.ts` | Installation handlers (mcp add, provider add) |
+| Config context | `src/renderer/config/ConfigProvider.tsx` | Auto-refresh on config change |
+| SSE broadcast | `src/server/sse.ts` | Frontend sync after install |
+| Auth token | `src-tauri/src/commands.rs` | Token sharing via IPC |
 
-1. **Context API for State Management** - Avoid prop drilling in large settings pages
-2. **Component Composition Patterns** - Build complex UIs from simple, focused components
-3. **Signals for Reactive State** - Emerging pattern for fine-grained reactivity (2026 trend)
-4. **Server Components** - Where applicable, move data fetching to server layer
+### Existing Patterns to Reuse
 
-**Sources:**
-- [React Stack Patterns](https://www.patterns.dev/react/react-2026/)
-- [React Architecture Patterns and Best Practices for 2026](https://www.bacancytechnology.com/blog/react-architecture-patterns-and-best-practices)
-- [Frontend Design Patterns That Actually Work in 2026](https://www.netguru.com/blog/frontend-design-patterns)
+1. **Overlay window pattern** (`lib.rs` lines 281-297)
+   - `WebviewWindowBuilder::new()` with unique label, external URL, standard decorations
+   - Used for splash screen, same pattern applies to Store
 
-### nova-agents Specific Context
+2. **Overlay hide/show** (`commands.rs` cmd_hide_overlay)
+   - `get_webview_window("label")` + `.hide()` / `.show()`
+   - Store window can reuse same pattern
 
-**Current State Analysis:**
-- **File Size:** 5707 lines (extremely large)
-- **State Management:** 77 hooks (useState, useEffect, useCallback)
-- **Settings Sections:** 9 sections (general, providers, mcp, skills, sub-agents, agent, usage-stats, about, account)
-- **Existing Extracted Components:** 5 (GlobalSkillsPanel, GlobalAgentsPanel, UsageStatsPanel, BotPlatformRegistry, WorkspaceConfigPanel)
+3. **Admin API handlers** (`admin-api.ts`)
+   - MCP add/remove/enable patterns already exist
+   - Store can call same handlers or extend with store-specific variants
 
-**Existing Architecture Patterns in Project:**
-- **AgentSettingsPanel** - Demonstrates section-based organization with separate section files
-- **WorkspaceConfigPanel** - Shows tab-based layout pattern
-- **Dual Context Pattern** - `ConfigDataContext` + `ConfigActionsContext` separation
-- **useConfig Hook** - Centralized configuration management
+4. **Config event listener** (`ConfigProvider.tsx` lines 331-343)
+   - `window.addEventListener('nova-agents:config-changed', handler)`
+   - Store installation triggers this automatically
 
-**Project Architecture Constraints:**
-- **Session-Centric Sidecar Model** - Settings uses Global Sidecar, not Tab-scoped
-- **Tauri v2 Desktop Framework** - IPC communication via `invoke()`
-- **Design System** - Paper/Ink color system with CSS variables
-- **TypeScript Strict Mode** - No `any` types allowed
+5. **IPC command structure** (`commands.rs`)
+   - Async command with validation, returns Result
+   - Store needs similar command structure
 
 ## Recommended Architecture
 
-### Component Hierarchy
+### System Overview
 
 ```
-Settings (index.tsx - 200 lines)
-    │
-    ├─→ SettingsLayout (150 lines)
-    │       ├─→ SettingsSidebar (200 lines)
-    │       └─→ Content Area (dynamic)
-    │               │
-    │               ├─→ AccountSection (100 lines)
-    │               ├─→ GeneralSection (300 lines)
-    │               ├─→ ProvidersSection (600 lines)
-    │               │       ├─→ ProviderCard × N (150 lines each)
-    │               │       ├─→ ApiKeyInput (80 lines)
-    │               │       ├─→ VerifyStatusIndicator (60 lines)
-    │               │       └─→ CustomProviderDialog (300 lines)
-    │               │
-    │               ├─→ McpSection (800 lines)
-    │               │       ├─→ McpServerCard × N (150 lines each)
-    │               │       ├─→ CustomMcpDialog (250 lines)
-    │               │       ├─→ PlaywrightConfigPanel (200 lines)
-    │               │       ├─→ EdgeTtsConfigPanel (180 lines)
-    │               │       └─→ GeminiImageConfigPanel (180 lines)
-    │               │
-    │               ├─→ SkillsAgentsSection (400 lines)
-    │               │       ├─→ GlobalSkillsPanel (existing)
-    │               │       └─→ GlobalAgentsPanel (existing)
-    │               │
-    │               ├─→ AgentSection (500 lines)
-    │               │       └─→ BotPlatformRegistry (existing)
-    │               │
-    │               ├─→ UsageStatsSection (300 lines)
-    │               │       └─→ UsageStatsPanel (existing)
-    │               │
-    │               └─→ AboutSection (200 lines)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Tauri Desktop App                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                           React Frontend                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐     │
+│  │   Tab 1     │  │   Tab 2     │  │  Settings   │  │ Store Window │     │
+│  │ session_123 │  │ session_456 │  │             │  │ (WebView)    │     │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬───────┘     │
+│         │                │                │                │               │
+├─────────┼────────────────┼────────────────┼────────────────┼───────────────┤
+│         │                │                │                │    Rust       │
+│   ┌─────┴────────────────┴─────┐         │         ┌──────┴─────────────┐ │
+│   │     SidecarManager         │         │         │  Store IPC Handler  │ │
+│   │  Session-Centric Model   │         │         │  cmd_store_install  │ │
+│   └─────┬────────────────┬─────┘         │         └──────┬─────────────┘ │
+│         │                │                │                │               │
+│         ▼                ▼                ▼                ▼               │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
+│  │ Sidecar A   │  │ Sidecar B   │  │Global Sidecar│  │  Admin API  │     │
+│  │ :31415      │  │ :31416      │  │             │  │ (install)   │     │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └──────┬──────┘     │
+│                                                              │              │
+│                                              ┌───────────────┴────────────┐ │
+│                                              │   SSE Broadcast          │ │
+│                                              │   'config-changed' event  │ │
+│                                              └───────────────┬────────────┘ │
+│                                              ┌───────────────┴────────────┐ │
+│                                              │   ConfigDataContext        │ │
+│                                              │   (auto-refresh on change)│ │
+│                                              └────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Directory Structure
+### Component Responsibilities
+
+| Component | Responsibility | Implementation |
+|-----------|----------------|----------------|
+| Settings page | Entry point with Store button | `src/renderer/pages/Settings.tsx` - add Store button |
+| Store WebView window | Remote Store UI container | Tauri `WebviewWindowBuilder` (like overlay pattern) |
+| Store IPC handler | Bridge WebView to Rust | New command `cmd_store_install` in `commands.rs` |
+| Admin API | Installation logic | `src/server/admin-api.ts` handlers |
+| ConfigDataContext | Config state + auto-refresh | Listens to `nova-agents:config-changed` event |
+| SSE broadcast | Frontend sync after install | `broadcast('config-changed', ...)` in admin-api |
+
+## Project Structure
 
 ```
-src/renderer/pages/Settings/
-├── index.tsx                    # Main entry, composition root
-├── SettingsLayout.tsx           # Layout container
-├── SettingsSidebar.tsx          # Navigation sidebar
-├── sections/                    # Settings sections
-│   ├── AccountSection.tsx       # Account settings
-│   ├── GeneralSection.tsx       # General settings
-│   ├── ProvidersSection.tsx     # Provider management
-│   ├── McpSection.tsx           # MCP tools management
-│   ├── SkillsAgentsSection.tsx  # Skills + Agents
-│   ├── AgentSection.tsx         # IM Bot settings
-│   ├── UsageStatsSection.tsx    # Usage statistics
-│   └── AboutSection.tsx         # About page
-├── components/                  # Shared components
-│   ├── ProviderCard.tsx         # Provider card
-│   ├── McpServerCard.tsx        # MCP server card
-│   ├── ApiKeyInput.tsx          # API key input
-│   ├── VerifyStatusIndicator.tsx # Verification status
-│   ├── CustomProviderDialog.tsx # Custom provider dialog
-│   ├── CustomMcpDialog.tsx      # Custom MCP dialog
-│   ├── PlaywrightConfigPanel.tsx # Playwright config
-│   ├── EdgeTtsConfigPanel.tsx   # Edge TTS config
-│   └── GeminiImageConfigPanel.tsx # Gemini Image config
-└── hooks/                       # Business logic hooks
-    ├── useProviderVerify.ts     # Provider verification
-    ├── useMcpServers.ts         # MCP server management
-    └── useSubscription.ts       # Subscription status
+src/
+├── renderer/
+│   ├── pages/
+│   │   └── Settings/
+│   │       └── index.tsx       # Add Store navigation item
+│   ├── windows/
+│   │   └── StoreWindow.tsx     # NEW: Store WebView wrapper
+│   └── hooks/
+│       └── useStoreWindow.ts    # NEW: Store window lifecycle
+├── server/
+│   └── admin-api.ts            # Existing: add store handlers
+src-tauri/
+├── src/
+│   ├── commands.rs             # Existing: add cmd_store_* commands
+│   ├── lib.rs                  # Existing: add store window builder
+│   └── store.rs                # NEW: Store-specific Rust logic
 ```
 
-## Component Boundaries
+### Structure Rationale
 
-### 1. Layout Layer
+- **`renderer/windows/StoreWindow.tsx`:** Isolates WebView logic from Settings, follows existing panel patterns
+- **`src-tauri/src/store.rs`:** Centralizes Store-specific Rust code, avoids command.rs bloat
+- **`useStoreWindow` hook:** Manages window lifecycle (open/close/focus), reuses existing patterns
 
-**SettingsLayout** (`SettingsLayout.tsx`)
-- **Responsibility:** Container for sidebar + content area
-- **Props:** `activeSection`, `onSectionChange`, `children`, `config`, `showDevTools`
-- **State:** None (controlled component)
-- **Communicates With:** SettingsSidebar, Content Area
+## Architectural Patterns
 
-**SettingsSidebar** (`SettingsSidebar.tsx`)
-- **Responsibility:** Navigation menu, section list
-- **Props:** `activeSection`, `onSectionChange`, `config`, `showDevTools`
-- **State:** None (controlled component)
-- **Communicates With:** SettingsLayout
+### Pattern 1: WebView Window Creation (Overlay Pattern)
 
-### 2. Section Layer
+**What:** Creating a secondary window to host remote content
+**When to use:** When loading external web content that needs native window chrome
+**Trade-offs:** + Sandboxed content, + Native window controls, + Standard navigation
 
-**ProvidersSection** (`ProvidersSection.tsx`)
-- **Responsibility:** Provider management (list, add, edit, delete, verify)
-- **Props:** Providers, API keys, verification status, callbacks
-- **Internal State:** Custom form, editing states, subscription status
-- **Communicates With:** ProviderCard, CustomProviderDialog, useConfig
-
-**McpSection** (`McpSection.tsx`)
-- **Responsibility:** MCP server management (enable, configure, custom servers)
-- **Props:** MCP servers, enabled IDs, toggle/add/update/delete callbacks
-- **Internal State:** Editing MCP, config panels (EdgeTTS, Playwright, GeminiImage)
-- **Communicates With:** McpServerCard, CustomMcpDialog, config panels
-
-### 3. Shared Component Layer
-
-**ProviderCard** (`ProviderCard.tsx`)
-- **Responsibility:** Display single provider with API key input and verification
-- **Props:** Provider, API key, verification status, event handlers
-- **State:** None (controlled component)
-- **Reusability:** Used in ProvidersSection list
-
-**McpServerCard** (`McpServerCard.tsx`)
-- **Responsibility:** Display single MCP server with enable toggle
-- **Props:** Server, enabled state, enabling state, error, event handlers
-- **State:** None (controlled component)
-- **Reusability:** Used in McpSection list
-
-**ApiKeyInput** (`ApiKeyInput.tsx`)
-- **Responsibility:** Secure API key input with visibility toggle
-- **Props:** Value, onChange, placeholder, disabled
-- **State:** Internal visibility toggle
-- **Reusability:** Used in ProviderCard, CustomProviderDialog
-
-**VerifyStatusIndicator** (`VerifyStatusIndicator.tsx`)
-- **Responsibility:** Display verification status (idle, loading, valid, invalid)
-- **Props:** Status, error message, retry callback
-- **State:** None (controlled component)
-- **Reusability:** Used in ProviderCard, CustomProviderDialog
-
-### 4. Dialog Layer
-
-**CustomProviderDialog** (`CustomProviderDialog.tsx`)
-- **Responsibility:** Add/edit custom provider
-- **Props:** Open state, provider to edit, save callback, close callback
-- **Internal State:** Form data (name, baseUrl, models, etc.)
-- **Communicates With:** ApiKeyInput, VerifyStatusIndicator
-
-**CustomMcpDialog** (`CustomMcpDialog.tsx`)
-- **Responsibility:** Add/edit custom MCP server
-- **Props:** Open state, server to edit, save callback, close callback
-- **Internal State:** Form data (command, args, env)
-- **Communicates With:** PlaywrightConfigPanel, EdgeTtsConfigPanel, GeminiImageConfigPanel
-
-### 5. Custom Hooks Layer
-
-**useProviderVerify** (`hooks/useProviderVerify.ts`)
-- **Responsibility:** Provider verification logic (API call, status tracking)
-- **Returns:** Verification status map, error map, isVerifying(), verifyProvider(), clearError()
-- **Internal State:** Verification status, errors, loading states
-- **Used By:** ProvidersSection
-
-**useMcpServers** (`hooks/useMcpServers.ts`)
-- **Responsibility:** MCP server management (list, enable/disable)
-- **Returns:** Servers list, enabled IDs, refreshServers(), toggleServer()
-- **Internal State:** Servers, enabled IDs, enabling states, errors
-- **Used By:** McpSection
-
-**useSubscription** (`hooks/useSubscription.ts`)
-- **Responsibility:** Subscription status checking and display
-- **Returns:** Subscription status, isChecking, refreshStatus()
-- **Internal State:** Subscription status, checking state
-- **Used By:** ProvidersSection
-
-## Data Flow
-
-### Unidirectional Data Flow
-
-```
-User Interaction
-    │
-    ▼
-Component Event Handler (onClick, onChange, etc.)
-    │
-    ▼
-Parent Callback (props.onSave, props.onToggle, etc.)
-    │
-    ▼
-Section Component Handler
-    │
-    ▼
-Custom Hook Action (useProviderVerify.verifyProvider)
-    │
-    ▼
-API Call (apiPost, invoke, or configService)
-    │
-    ▼
-State Update (useState or useConfig updateConfig)
-    │
-    ▼
-Re-render with New Props
-    │
-    ▼
-Child Components Receive New Props
+**Example:**
+```rust
+// From lib.rs lines 281-297 - overlay window pattern (store follows same)
+match WebviewWindowBuilder::new(
+    app,
+    "store",  // unique label
+    tauri::WebviewUrl::External(store_url.parse().unwrap()),
+)
+.decorations(true)
+.resizable(true)
+.inner_size(1000.0, 700.0)
+.center()
+.visible(true)
+.build()
 ```
 
-### Configuration Data Flow
+### Pattern 2: IPC Command Handler
 
-```
-useConfig Hook (Global State)
-    │
-    ├─→ Settings (index.tsx)
-    │       │
-    │       ├─→ ProvidersSection
-    │       │       ├─→ ProviderCard × N
-    │       │       └─→ CustomProviderDialog
-    │       │
-    │       └─→ McpSection
-    │               ├─→ McpServerCard × N
-    │               └─→ CustomMcpDialog
-    │
-    └─→ Direct API Calls (apiFetch, apiPost)
-            └─→ Rust Backend
-                    └─→ Bun Sidecar
-```
+**What:** Tauri command bridging frontend/secondary window to Rust backend
+**When to use:** When WebView needs to trigger native functionality
+**Trade-offs:** + Type-safe, + Async, + Follows existing patterns
 
-### Local vs Global State
-
-| State Type | Location | Rationale |
-|------------|----------|-----------|
-| `activeSection` | Settings (parent) | Shared across layout, controls which section renders |
-| `providers` | useConfig (global) | Global configuration, disk-first persistence |
-| `apiKeys` | useConfig (global) | Global configuration, security-sensitive |
-| `mcpServers` | McpSection (local) | Section-specific, not needed elsewhere |
-| `customForm` | ProvidersSection (local) | Transient form state, only needed during editing |
-| `subscriptionStatus` | ProvidersSection (local) | Only needed in providers section |
-| `verifyStatus` | useProviderVerify (hook) | Encapsulated business logic |
-
-## Build Order Dependencies
-
-### Phase 1: Foundation (Low Risk)
-1. **Create directory structure** - `Settings/`, `sections/`, `components/`, `hooks/`
-2. **Extract layout components** - `SettingsLayout`, `SettingsSidebar`
-3. **Migrate simple sections** - `AccountSection`, `AboutSection`
-4. **Create main entry** - `index.tsx` composition root
-
-**Dependencies:** None
-**Risk:** Low (static sections, no complex state)
-
-### Phase 2: Shared Components (Medium Risk)
-1. **Extract `ProviderCard`** - From current providers rendering
-2. **Extract `ApiKeyInput`** - From provider card
-3. **Extract `VerifyStatusIndicator`** - From verification UI
-4. **Extract `McpServerCard`** - From MCP servers list
-
-**Dependencies:** Phase 1 (layout structure must exist)
-**Risk:** Medium (requires careful state management extraction)
-
-### Phase 3: Business Logic Hooks (Medium Risk)
-1. **Create `useProviderVerify`** - Extract verification logic
-2. **Create `useMcpServers`** - Extract MCP management
-3. **Create `useSubscription`** - Extract subscription checking
-
-**Dependencies:** Phase 2 (shared components must exist)
-**Risk:** Medium (complex state management, API calls)
-
-### Phase 4: Complex Sections (High Risk)
-1. **Migrate `ProvidersSection`** - Use shared components + hooks
-2. **Extract `CustomProviderDialog`** - Complex form with validation
-3. **Migrate `McpSection`** - Use shared components + hooks
-
-**Dependencies:** Phase 2 + Phase 3 (shared components and hooks required)
-**Risk:** High (most complex sections, heavy state management)
-
-### Phase 5: Remaining Sections (Low Risk)
-1. **Migrate `GeneralSection`** - Simple toggles and settings
-2. **Migrate `SkillsAgentsSection`** - Compose existing panels
-3. **Migrate `AgentSection`** - Compose existing panels
-4. **Migrate `UsageStatsSection`** - Compose existing panel
-
-**Dependencies:** Phase 1 (layout structure)
-**Risk:** Low (most logic already extracted to existing components)
-
-### Phase 6: Dialogs and Panels (Low Risk)
-1. **Extract `PlaywrightConfigPanel`** - From MCP dialog
-2. **Extract `EdgeTtsConfigPanel`** - From MCP dialog
-3. **Extract `GeminiImageConfigPanel`** - From MCP dialog
-4. **Extract `CustomMcpDialog`** - Compose config panels
-
-**Dependencies:** Phase 4 (McpSection must exist)
-**Risk:** Low (isolated components)
-
-### Phase 7: Cleanup (Low Risk)
-1. **Delete old `Settings.tsx`** - After all sections migrated
-2. **Update imports** - Fix all import paths
-3. **Run tests** - Full regression testing
-4. **Performance audit** - Check for unnecessary re-renders
-
-**Dependencies:** All previous phases
-**Risk:** Low (cleanup phase)
-
-## Architecture Patterns
-
-### 1. Compound Component Pattern
-
-**Used By:** SettingsLayout, CustomProviderDialog
-
-```typescript
-<SettingsLayout activeSection="providers" onSectionChange={handleSectionChange}>
-  <ProvidersSection {...providerProps} />
-</SettingsLayout>
-```
-
-**Benefits:**
-- Flexible composition
-- Clear parent-child relationships
-- Shared state context
-
-### 2. Container/Presenter Pattern
-
-**Used By:** All section components
-
-```typescript
-// Container component (business logic)
-function ProvidersSection({ providers, onSaveApiKey, ... }) {
-  const [editingProvider, setEditingProvider] = useState(null);
-  const { verifyStatus, verifyProvider } = useProviderVerify();
-
-  // Render presenter components
-  return (
-    <>
-      {providers.map(provider => (
-        <ProviderCard
-          key={provider.id}
-          provider={provider}
-          onVerify={() => verifyProvider(provider, apiKey)}
-          // ... props down
-        />
-      ))}
-    </>
-  );
+**Example:**
+```rust
+// New command in commands.rs
+#[tauri::command]
+pub async fn cmd_store_install(
+    app: AppHandle,
+    item: StoreInstallItem,
+) -> Result<StoreInstallResult, String> {
+    // 1. Validate item type
+    // 2. Call Admin API via HTTP to Global Sidecar
+    // 3. Broadcast SSE event for frontend sync
+    // 4. Return result
 }
 ```
 
-**Benefits:**
-- Separation of concerns (logic vs presentation)
-- Easier testing
-- Reusable presenters
+### Pattern 3: Config Auto-Refresh via Custom Event
 
-### 3. Custom Hooks Pattern
-
-**Used By:** useProviderVerify, useMcpServers, useSubscription
-
-```typescript
-function ProvidersSection() {
-  const { verifyStatus, verifyProvider, isVerifying } = useProviderVerify();
-  const { mcpServers, toggleServer } = useMcpServers();
-  const { subscriptionStatus, refreshStatus } = useSubscription();
-
-  // Render UI using hook returns
-}
-```
-
-**Benefits:**
-- Business logic encapsulation
-- Reusable across components
-- Easier testing (logic separated from UI)
-
-### 4. Props Drilling vs Context
-
-**Decision:** Use props drilling for section-specific data, use Context for global configuration.
-
-```typescript
-// ✅ GOOD: Props drilling for section-specific data
-<ProvidersSection
-  providers={providers}
-  apiKeys={apiKeys}
-  onSaveApiKey={handleSaveApiKey}
-/>
-
-// ✅ GOOD: Context for global configuration
-const { config, updateConfig } = useConfig();
-```
-
-**Rationale:**
-- Settings page is not deeply nested (max 3 levels)
-- Props drilling makes data flow explicit
-- Context is used only for global app configuration (useConfig)
-- Avoids over-engineering with multiple Contexts
-
-## Performance Considerations
-
-### Re-render Optimization
-
-**Problem:** Settings page has 30+ pieces of state, changes could trigger cascading re-renders.
-
-**Solutions:**
-1. **React.memo** - Wrap shared components (ProviderCard, McpServerCard)
-2. **useMemo** - Memoize expensive computations (provider lists, filtered servers)
-3. **useCallback** - Stable callbacks for event handlers
-4. **Component splitting** - Smaller components re-render independently
+**What:** Frontend automatically refreshes config when backend signals change
+**When to use:** When external changes modify config
+**Trade-offs:** + Automatic sync, + No manual refresh, + Already implemented
 
 **Example:**
 ```typescript
-const ProviderCard = React.memo(function ProviderCard({ provider, apiKey, onVerify, ... }) {
-  // Component only re-renders when props change
-});
+// From ConfigProvider.tsx lines 331-343
+useEffect(() => {
+    const handler = () => {
+        loadAppConfig().then(latest => {
+            if (isMountedRef.current) setConfig(latest);
+        });
+    };
+    window.addEventListener('nova-agents:config-changed', handler);
+    return () => window.removeEventListener('nova-agents:config-changed', handler);
+}, []);
 ```
 
-### Lazy Loading
+### Pattern 4: Tab-Scoped vs Global API
 
-**Problem:** All sections loaded upfront, increasing initial bundle size.
+**What:** Distinguishing between per-tab and global API endpoints
+**When to use:** Store window should always use Global Sidecar (no session context)
+**Trade-offs:** + Correct routing, + Isolation
 
-**Solution:**
+**Example:**
 ```typescript
-const McpSection = lazy(() => import('./sections/McpSection'));
-const ProvidersSection = lazy(() => import('./sections/ProvidersSection'));
-
-// In render:
-<Suspense fallback={<LoadingSpinner />}>
-  {activeSection === 'mcp' && <McpSection {...props} />}
-</Suspense>
+// StoreWindow uses global API (no TabProvider wrapper)
+import { apiFetch } from '@/api/apiFetch';  // Global Sidecar client
+// NOT useTabState() which is tab-scoped
 ```
 
-**Benefits:**
-- Smaller initial bundle
-- Faster initial load
-- On-demand loading of complex sections
+## Data Flow
 
-## Error Boundaries
+### Store Installation Flow
 
-**Strategy:** Wrap each section in error boundary to isolate failures.
+```
+[User clicks Store in Settings]
+    │
+    ▼
+[StoreWindow opens] → [WebView loads remote Store URL]
+    │
+    ▼
+[User browses Store, clicks "Install" on item]
+    │
+    ▼
+[WebView calls window.__TAURI__.core.invoke('cmd_store_install', { item })]
+    │
+    ▼
+[Rust cmd_store_install validates + calls Admin API]
+    │
+    ├──► [HTTP POST to Global Sidecar /api/admin/*]
+    │
+    ▼
+[Admin API handler writes config + broadcasts SSE]
+    │
+    ▼
+[SSE event 'config-changed' emitted]
+    │
+    ▼
+[ConfigDataContext listener fires] → [config state auto-refreshes]
+    │
+    ▼
+[Settings lists (MCP/Provider/Skill) automatically update]
+```
+
+### Authentication Token Sharing Flow
+
+```
+[Store WebView needs auth token for API calls]
+    │
+    ▼
+[WebView retrieves token via IPC]
+    │
+    ├──► invoke('cmd_get_store_auth_token') → [Rust reads from secure storage]
+    │
+    ▼
+[Token injected into Store WebView context via URL params or JS bridge]
+    │
+    ▼
+[Store WebView uses token for authenticated API calls]
+```
+
+## Integration Points
+
+### External Services
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| Remote Store URL | External WebView window | URL configured in app config |
+| Auth token | IPC command to Rust | Token stored securely, retrieved via `cmd_get_store_auth_token` |
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| Store WebView to Rust | `invoke()` IPC | New `cmd_store_*` commands |
+| Rust to Global Sidecar | HTTP via `local_http` | Admin API endpoints |
+| Global Sidecar to Config | Disk write + SSE | `atomicModifyConfig` + `broadcast()` |
+| ConfigContext to React | Context + useEffect | Auto-refresh on `nova-agents:config-changed` event |
+
+## Key Technical Decisions
+
+### Window Management
+
+| Decision | Rationale |
+|----------|-----------|
+| Store window label: `"store"` | Unique identifier for `get_webview_window("store")` |
+| Standard decorations | User expects native window controls |
+| Resizable, ~1000x700 | Matches typical web app dimensions |
+| Centered on open | Consistent with overlay pattern |
+| Hidden on close (not destroyed) | Quick re-open without reload |
+
+### IPC Command Design
 
 ```typescript
-class SectionErrorBoundary extends React.Component {
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="error-message">
-          <p>此设置区块加载失败</p>
-          <button onClick={this.handleRetry}>重试</button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
+// Proposed command signatures
+interface StoreInstallItem {
+  type: 'mcp' | 'provider' | 'skill';
+  id: string;
+  version?: string;
+  metadata?: Record<string, unknown>;
 }
 
-// Usage:
-<SectionErrorBoundary>
-  <ProvidersSection {...props} />
-</SectionErrorBoundary>
+interface StoreInstallResult {
+  success: boolean;
+  installedId?: string;
+  name?: string;
+  error?: string;
+}
+
+// Auth token command
+interface StoreAuthResult {
+  success: boolean;
+  token?: string;
+  error?: string;
+}
 ```
 
-**Benefits:**
-- One section failure doesn't crash entire settings page
-- Better user experience
-- Easier debugging
+### Config Hot Update Strategy
 
-## Testing Strategy
+Store installation triggers config changes via Admin API:
+1. **Write config** - `atomicModifyConfig` updates disk
+2. **Broadcast SSE** - `broadcast('config-changed', {...})`
+3. **Frontend auto-refresh** - ConfigDataContext listener fires
 
-### Unit Tests
-- **Shared Components:** ProviderCard, ApiKeyInput, VerifyStatusIndicator
-- **Hooks:** useProviderVerify, useMcpServers, useSubscription
-- **Utilities:** parsePositiveInt, getPlaywrightDefaultArgs
+**No manual refresh needed** - follows existing pattern from CLI config changes.
 
-### Integration Tests
-- **ProvidersSection:** Add/edit/delete provider flow
-- **McpSection:** Enable/configure MCP server flow
-- **CustomProviderDialog:** Form validation and submission
+### Security Considerations
 
-### Visual Regression Tests
-- Ensure refactored UI matches original design exactly
-- Test all states (idle, loading, success, error)
+| Concern | Mitigation |
+|---------|------------|
+| Store URL trust | Validate URL in CSP, restrict to configured domain |
+| Token exposure | IPC bridge, not direct token access in WebView |
+| Install validation | Server-side item validation + checksum verification |
+| CSP compliance | Add Store domain to allowed connect sources in tauri.conf.json |
 
-## Migration Risks
+## Anti-Patterns
 
-### Risk 1: State Management Complexity
-**Problem:** 77 hooks in current file, difficult to extract without breaking interactions.
+### Anti-Pattern 1: Direct Global Sidecar Access from WebView
 
-**Mitigation:**
-- Migrate incrementally by section
-- Keep existing hook dependencies during migration
-- Test each section thoroughly before proceeding
+**What people do:** Try to fetch directly to `127.0.0.1:{port}` from WebView
+**Why it's wrong:** WebView doesn't have port knowledge, bypasses IPC security
+**Do this instead:** Always use IPC commands (`invoke`) as bridge
 
-### Risk 2: Prop Drilling
-**Problem:** Deep component trees may require excessive prop passing.
+### Anti-Pattern 2: Skipping SSE Broadcast After Install
 
-**Mitigation:**
-- Use compound component pattern to reduce depth
-- Extract sub-components to flatten hierarchy
-- Consider section-specific Context only if drilling exceeds 3 levels
+**What people do:** Write config but forget to broadcast event
+**Why it's wrong:** Frontend lists won't auto-refresh, user sees stale data
+**Do this instead:** Always call `broadcast('config-changed', {...})` in Admin API handlers
 
-### Risk 3: Functionality Regression
-**Problem:** Complex interactions (OAuth, verification, file dialogs) may break.
+### Anti-Pattern 3: Using Tab-scoped API in Store Window
 
-**Mitigation:**
-- Comprehensive test checklist before migration
-- Side-by-side comparison during development
-- Keep old Settings.tsx until all sections verified
+**What people do:** Using `useTabState()` pattern in Store
+**Why it's wrong:** Store window has no tab context, will fail/nullify
+**Do this instead:** Use `apiFetch` (global) not `apiPost` (tab-scoped)
 
-## Roadmap Implications
+### Anti-Pattern 4: Storing Token in WebView URL
 
-Based on this architecture research, the suggested phase structure is:
+**What people do:** Pass auth token as URL query parameter
+**Why it's wrong:** Token visible in browser history, logs, referrer headers
+**Do this instead:** Use IPC to inject token via JavaScript bridge post-load
 
-1. **Phase 1: Foundation** (ARCH-01, ARCH-02, ARCH-03)
-   - Create layout structure, migrate static sections
-   - Addresses: Layout composition, section isolation
-   - Avoids: Complex state management, API interactions
+## Scaling Considerations
 
-2. **Phase 2: Shared Components** (SHARE-01 through SHARE-04)
-   - Extract reusable components (ProviderCard, ApiKeyInput, etc.)
-   - Addresses: Component reusability, props interface design
-   - Avoids: Business logic complexity
+| Scale | Architecture Adjustments |
+|-------|-------------------------|
+| 0-1k users | Single Store window instance sufficient |
+| 1k-100k users | Store backend caching, CDN for assets |
+| 100k+ users | Store becomes separate microservice with auth |
 
-3. **Phase 3: Business Logic Hooks** (HOOK-01, HOOK-02, HOOK-03)
-   - Encapsulate complex state management
-   - Addresses: State organization, testability
-   - Avoids: UI changes
+### Scaling Priorities
 
-4. **Phase 4: Complex Sections** (SECTION-03, SECTION-04)
-   - Migrate providers and MCP sections using shared components + hooks
-   - Addresses: Most complex functionality
-   - Avoids: Simple sections (already migrated)
+1. **First bottleneck:** Store WebView loading time - mitigated by local cache headers
+2. **Second bottleneck:** Config file locking on install - `atomicModifyConfig` already handles
 
-5. **Phase 5: Simple Sections** (SECTION-01, SECTION-02, SECTION-05)
-   - Migrate remaining sections
-   - Addresses: Completeness
-   - Avoids: Complex logic (already handled)
+## Phase Structure Recommendations
 
-6. **Phase 6: Dialogs** (DIALOG-01 through DIALOG-05)
-   - Extract complex dialogs and panels
-   - Addresses: Modal complexity
-   - Avoids: Core settings logic
+Based on this architecture research:
 
-**Phase ordering rationale:**
-- Build foundational structure first (layout)
-- Extract reusable pieces next (shared components)
-- Encapsulate business logic (hooks)
-- Migrate complex sections using extracted pieces
-- Finish with simple sections and dialogs
-- Each phase builds on previous, minimizing risk
+1. **Phase 1: Window Foundation**
+   - Create Store window builder in lib.rs
+   - Create `useStoreWindow` hook
+   - Create `StoreWindow` component
+   - Addresses: Window creation, lifecycle management
 
-**Research flags for phases:**
-- Phase 4 (Complex Sections): Likely needs deeper research on provider verification flow, MCP enable/disable logic
-- Phase 6 (Dialogs): May need additional research on form validation patterns, OAuth integration
+2. **Phase 2: IPC Bridge**
+   - Create `cmd_store_install` command
+   - Create `cmd_get_store_auth_token` command
+   - Wire up WebView to Rust communication
+   - Addresses: IPC communication, auth token sharing
+
+3. **Phase 3: Admin API Integration**
+   - Extend Admin API with store handlers
+   - Wire up SSE broadcast
+   - Test end-to-end install flow
+   - Addresses: Installation logic, config hot update
+
+4. **Phase 4: Settings Integration**
+   - Add Store button to Settings
+   - Connect Store button to window open
+   - End-to-end testing
+   - Addresses: User entry point
+
+**Research flags:**
+- Phase 2: May need deeper research on secure token injection into WebView
+- Phase 3: May need research on install rollback/error recovery
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Component boundaries | HIGH | Clear separation of concerns identified |
-| Data flow direction | HIGH | Standard React unidirectional flow |
-| Build order | HIGH | Logical dependencies mapped |
-| Shared component design | HIGH | Similar patterns exist in AgentSettings |
-| Hook encapsulation | MEDIUM | Complex state logic may need refinement |
-| Performance optimization | MEDIUM | Requires profiling to validate |
-| Error handling | MEDIUM | Error boundary strategy needs testing |
+| Window patterns | HIGH | Overlay pattern in lib.rs is direct reference |
+| IPC structure | HIGH | Follows existing command patterns exactly |
+| Config auto-refresh | HIGH | Already implemented in ConfigProvider |
+| Admin API extension | HIGH | MCP/Provider handlers are direct templates |
+| Auth token sharing | MEDIUM | IPC pattern clear, secure injection needs validation |
 
 ## Gaps to Address
 
-1. **Provider Verification Flow** - Detailed API call sequence and error handling
-2. **MCP Enable/Disable Logic** - Async operation management and error recovery
-3. **OAuth Integration** - Third-party auth flow architecture (if applicable)
-4. **Form Validation** - Validation patterns for custom provider/MCP forms
-5. **Performance Profiling** - Identify actual re-render bottlenecks
-6. **Error Recovery** - User-facing error messages and retry strategies
+1. **Secure token injection** - How to inject auth token into WebView without URL exposure
+2. **Store URL configuration** - Where/how to configure the Store URL (env var, config, hardcoded)
+3. **Install rollback** - What happens if install partially fails
+4. **WebView lifecycle** - Should Store window be reused or recreated each open
+5. **Close behavior** - Hide vs destroy, memory management
 
 ## Sources
 
-### Web Research (2026)
-- [React Stack Patterns](https://www.patterns.dev/react/react-2026/)
-- [React Architecture Patterns and Best Practices for 2026](https://www.bacancytechnology.com/blog/react-architecture-patterns-and-best-practices)
-- [React Design Patterns That Cannot Be Missed in 2026](https://radixweb.com/blog/react-design-patterns)
-- [Frontend Design Patterns That Actually Work in 2026](https://www.netguru.com/blog/frontend-design-patterns)
-- [React in 2026: From UI Library to Full-Stack Architecture](https://medium.com/@basakbilginoglu/react-in-2026-from-ui-library-to-full-stack-architecture-0bda700d765b)
+### Project Code
+- `src-tauri/src/lib.rs` (lines 256-297) - Overlay window pattern
+- `src-tauri/src/commands.rs` (cmd_hide_overlay) - Window visibility pattern
+- `src/server/admin-api.ts` - Installation logic patterns
+- `src/renderer/config/ConfigProvider.tsx` (lines 331-343) - Config auto-refresh
+- `src/server/sse.ts` - SSE broadcast mechanism
+- `src/renderer/pages/Settings.tsx` - Settings structure (being refactored)
 
-### Project Documentation
-- `.planning/PROJECT.md` - Project context and requirements
-- `docs/settings-componentization.md` - Detailed design document
+### Project Docs
+- `.planning/PROJECT.md` - Store feature requirements
 - `specs/tech_docs/architecture.md` - Project architecture constraints
 - `specs/guides/design_guide.md` - Design system specifications
 
-### Code Analysis
-- `src/renderer/pages/Settings.tsx` (5707 lines) - Current implementation
-- `src/renderer/components/AgentSettings/` - Existing component patterns
-- `src/renderer/context/` - Existing context patterns
-- `src/renderer/hooks/` - Existing hook patterns
+---
+
+*Architecture research for: nova-agents Store feature integration*
+*Researched: 2026-04-25*
