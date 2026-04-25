@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: null
-milestone_name: null
+milestone: v1.1
+milestone_name: Store Feature
 status: planning
-last_updated: "2026-04-25T04:35:00.000Z"
+last_updated: "2026-04-25T04:40:00.000Z"
 progress:
   total_phases: 0
   completed_phases: 0
@@ -14,6 +14,7 @@ progress:
 # Project State
 
 **Project:** nova-agents
+**Version:** v1.1
 **Last Updated:** 2026-04-25
 
 ---
@@ -26,7 +27,16 @@ progress:
 
 ### Current Focus
 
-No active milestone — ready for next planning cycle
+v1.1 Store Feature — 商店功能开发
+
+---
+
+## Current Position
+
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-25 — Milestone v1.1 started
 
 ---
 
@@ -39,9 +49,16 @@ No active milestone — ready for next planning cycle
 
 ---
 
-## Last Activity
+## Milestone Goals (v1.1)
 
-Completed v1.0.1 Startup Optimization milestone — phases 07-08 (startup profiling, branded splash overlay)
+**Goal:** 在 Settings 增加商店入口，用户可浏览和安装 Provider/Skills/MCP
+
+**Key features:**
+- Settings 商店入口按钮
+- 独立 WebView 窗口加载远程商店页面
+- WebView 与 Tauri IPC 通信（安装指令）
+- 认证 Token 在 WebView 和 Tauri 之间共享
+- 安装完成后 Settings 对应列表自动热更新
 
 ---
 
