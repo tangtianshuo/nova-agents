@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Store Feature
 status: planning
-last_updated: "2026-04-25T04:40:00.000Z"
+last_updated: "2026-04-25"
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -33,10 +33,9 @@ v1.1 Store Feature — 商店功能开发
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-04-25 — Milestone v1.1 started
+**Phase:** 09 - Window Foundation
+**Status:** Not started
+**Progress:** [----------] 0%
 
 ---
 
@@ -46,6 +45,7 @@ Last activity: 2026-04-25 — Milestone v1.1 started
 |-----------|--------|--------|---------|
 | v1.0 | 6 | Complete | 2026-04-12 |
 | v1.0.1 | 2 | Complete | 2026-04-25 |
+| v1.1 | 4 | In progress | - |
 
 ---
 
@@ -62,8 +62,56 @@ Last activity: 2026-04-25 — Milestone v1.1 started
 
 ---
 
+## Phase Details
+
+| Phase | Name | Requirements | Status |
+|-------|------|--------------|--------|
+| 09 | Window Foundation | STORE-01, STORE-02 | Not started |
+| 10 | IPC Bridge | STORE-03, STORE-04 | Not started |
+| 11 | Admin API Integration | STORE-05, STORE-06 | Not started |
+| 12 | Settings Integration and Polish | STORE-07 | Not started |
+
+---
+
 ## Blockers
 
 None
+
+---
+
+## Accumulated Context
+
+### Key Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| WebView 加载远程 URL | 商店页面由后台提供，可频繁更新 |
+| IPC 通信安装 | WebView 通知 Tauri 执行安装 |
+| 热更新列表 | 安装后无需刷新，列表自动更新 |
+
+### Architecture Notes
+
+- Store WebView 使用 `WebviewWindowBuilder` 创建，与 overlay window 模式相同
+- 认证 Token 通过 IPC 事件注入（非 URL 参数），防止 Token 泄漏
+- 安装指令通过 `cmd_store_install` 路由到 Admin API
+- Config 变更通过 SSE broadcast 广播，`ConfigDataContext` 自动监听刷新
+
+### Research Findings
+
+- Phase 1 风险：Token 泄漏、WebView 孤儿窗口
+- Phase 2 风险：IPC 消息格式稳定性
+- Phase 3 风险：Admin API 静默失败
+- Phase 4 风险：热更新竞态条件
+
+---
+
+## Quick Tasks
+
+| Task | Status |
+|------|--------|
+| Phase 09: Window Foundation | Pending |
+| Phase 10: IPC Bridge | Pending |
+| Phase 11: Admin API Integration | Pending |
+| Phase 12: Settings Integration and Polish | Pending |
 
 *State initialized: 2026-04-09*

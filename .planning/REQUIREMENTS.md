@@ -29,13 +29,13 @@ Requirements for Store feature. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STORE-01 | Phase 1 | Pending |
-| STORE-02 | Phase 1 | Pending |
-| STORE-03 | Phase 2 | Pending |
-| STORE-04 | Phase 2 | Pending |
-| STORE-05 | Phase 3 | Pending |
-| STORE-06 | Phase 3 | Pending |
-| STORE-07 | Phase 4 | Pending |
+| STORE-01 | Phase 09 | Pending |
+| STORE-02 | Phase 09 | Pending |
+| STORE-03 | Phase 10 | Pending |
+| STORE-04 | Phase 10 | Pending |
+| STORE-05 | Phase 11 | Pending |
+| STORE-06 | Phase 11 | Pending |
+| STORE-07 | Phase 12 | Pending |
 
 **Coverage:**
 - v1 requirements: 7 total
